@@ -280,6 +280,13 @@ func (k *X25519Key) CanDecrypt() bool {
 }
 
 func (k *X25519Key) Encrypt(plaintext []byte) ([]byte, error) {
+	if k.pub == nil {
+		pub, err := k.priv.generatePublic()
+		if err != nil {
+			return nil, err
+		}
+		k.pub = pub
+	}
 	return k.pub.EncryptAsym(plaintext)
 }
 
