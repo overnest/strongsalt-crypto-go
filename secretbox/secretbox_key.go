@@ -120,6 +120,10 @@ func (k *SecretboxKey) CanDecrypt() bool {
 	return true
 }
 
+func (k *SecretboxKey) CanMAC() bool {
+	return false
+}
+
 func (k *SecretboxKey) Encrypt(plaintext []byte) ([]byte, error) {
 	nonceSlice := make([]byte, nonceSizeV1)
 	n, _ := rand.Read(nonceSlice)

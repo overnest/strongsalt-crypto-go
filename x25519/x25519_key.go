@@ -259,6 +259,10 @@ func (k *X25519Key) CanDecrypt() bool {
 	return true
 }
 
+func (k *X25519Key) CanMAC() bool {
+	return false
+}
+
 func (k *X25519Key) Encrypt(plaintext []byte) ([]byte, error) {
 	return k.pub.EncryptAsym(plaintext)
 }

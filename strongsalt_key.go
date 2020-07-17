@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/overnest/strongsalt-crypto-go/hmac"
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
 	"github.com/overnest/strongsalt-crypto-go/secretbox"
 	"github.com/overnest/strongsalt-crypto-go/version"
@@ -25,9 +26,10 @@ const (
 var (
 	/*Type_X25519    = newKeyType("X25519", false, false, reflect.TypeOf(x25519.X25519Key{}))
 	Type_XChaCha20 = newKeyType("XChaCha20", true, true, reflect.TypeOf(xchacha20.XChaCha20Key{}))*/
-	Type_Secretbox = newKeyType("Secretbox", true, false, &secretbox.SecretboxKey{})
-	Type_X25519    = newKeyType("X25519", false, false, &x25519.X25519Key{})
-	Type_XChaCha20 = newKeyType("XChaCha20", true, true, &xchacha20.XChaCha20Key{})
+	Type_Secretbox  = newKeyType("Secretbox", true, false, &secretbox.SecretboxKey{})
+	Type_X25519     = newKeyType("X25519", false, false, &x25519.X25519Key{})
+	Type_XChaCha20  = newKeyType("XChaCha20", true, true, &xchacha20.XChaCha20Key{})
+	Type_HMACSha512 = newKeyType("HMACSha512", false, false, &hmac.HmacKey{HashType: hmac.TypeSha512})
 )
 
 type KeyType struct {
@@ -164,25 +166,26 @@ func DeserializeKey(data []byte) (*StrongSaltKey, error) {
 		return nil, err
 	}
 	ver := genericVer.(*KeyVersion)
-	keyTypeLenBytes := make([]byte, keyTypeLenSerialSize)
-	buf.Read(keyTypeLenBytes)
-	keyTypeLen := binary.LittleEndian.Uint16(keyTypeLenBytes)
-	keyTypeBytes := make([]byte, keyTypeLen)
-	n, err := buf.Read(keyTypeBytes)
-	if err != nil {
-		return nil, err
-	}
-	if n != int(keyTypeLen) {
-		return nil, fmt.Errorf("read wrong number of bytes when deserializing key type")
-	}
-	keyType, err := deserializeKeyType(keyTypeBytes)
-	if err != nil {
-		return nil, err
-	}
-	keyBytes := buf.Bytes()
+	var keyType *KeyType
 	var key KeyBase
 	switch ver {
 	case VERSION_ONE:
+		keyTypeLenBytes := make([]byte, keyTypeLenSerialSize)
+		buf.Read(keyTypeLenBytes)
+		keyTypeLen := binary.LittleEndian.Uint16(keyTypeLenBytes)
+		keyTypeBytes := make([]byte, keyTypeLen)
+		n, err := buf.Read(keyTypeBytes)
+		if err != nil {
+			return nil, err
+		}
+		if n != int(keyTypeLen) {
+			return nil, fmt.Errorf("read wrong number of bytes when deserializing key type")
+		}
+		keyType, err = deserializeKeyType(keyTypeBytes)
+		if err != nil {
+			return nil, err
+		}
+		keyBytes := buf.Bytes()
 		/*deserializeKeyFunc, exists := keyType.Type.MethodByName(deserializeKeyFuncName)
 		if !exists {
 			return nil, fmt.Errorf("key type %v does not have method %v", keyType.Name, deserializeKeyFuncName)
@@ -208,8 +211,29 @@ func (k *StrongSaltKey) Encrypt(plaintext []byte) ([]byte, error) {
 }
 
 func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
-	if !k.Key.CanEncrypt() {
+	if !k.Key.CanDecrypt() {
 		return nil, fmt.Errorf("Key of type %v cannot decrypt data.", k.Type.Name)
 	}
 	return k.Key.(KeyEncryptDecrypt).Decrypt(ciphertext)
+}
+
+func (k *StrongSaltKey) MACWrite(data []byte) (int, error) {
+	if !k.Key.CanMAC() {
+		return 0, fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
+	}
+	return k.Key.(KeyMAC).Write(data)
+}
+
+func (k *StrongSaltKey) MACSum(data []byte) ([]byte, error) {
+	if !k.Key.CanMAC() {
+		return nil, fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
+	}
+	return k.Key.(KeyMAC).Sum(data)
+}
+
+func (k *StrongSaltKey) MACVerify(tag []byte) (bool, error) {
+	if !k.Key.CanMAC() {
+		return false, fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
+	}
+	return k.Key.(KeyMAC).Verify(tag)
 }

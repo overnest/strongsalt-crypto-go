@@ -13,10 +13,17 @@ type KeyEncryptDecrypt interface {
 	Decrypt([]byte) ([]byte, error)
 }
 
+type KeyMAC interface {
+	Write([]byte) (int, error)
+	Sum([]byte) ([]byte, error)
+	Verify([]byte) (bool, error)
+}
+
 type KeyBase interface {
 	KeySerialization
 	CanEncrypt() bool
 	CanDecrypt() bool
+	CanMAC() bool
 }
 
 type KeySymmetric interface {
