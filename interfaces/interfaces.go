@@ -23,7 +23,6 @@ type KeyBase interface {
 	KeySerialization
 	CanEncrypt() bool
 	CanDecrypt() bool
-	CanMAC() bool
 }
 
 type KeySymmetric interface {

@@ -117,12 +117,9 @@ func (k *HmacKey) GenerateKey() (KeyBase, error) {
 func (k *HmacKey) CanEncrypt() bool {
 	return false
 }
+
 func (k *HmacKey) CanDecrypt() bool {
 	return false
-}
-
-func (k *HmacKey) CanMAC() bool {
-	return true
 }
 
 func (k *HmacKey) Serialize() ([]byte, error) {

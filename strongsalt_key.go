@@ -217,23 +217,31 @@ func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
 	return k.Key.(KeyEncryptDecrypt).Decrypt(ciphertext)
 }
 
+func (k *StrongSaltKey) CanMAC() bool {
+	_, ok := k.Key.(KeyMAC)
+	return ok
+}
+
 func (k *StrongSaltKey) MACWrite(data []byte) (int, error) {
-	if !k.Key.CanMAC() {
+	mac, ok := k.Key.(KeyMAC)
+	if !ok {
 		return 0, fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
 	}
-	return k.Key.(KeyMAC).Write(data)
+	return mac.Write(data)
 }
 
 func (k *StrongSaltKey) MACSum(data []byte) ([]byte, error) {
-	if !k.Key.CanMAC() {
+	mac, ok := k.Key.(KeyMAC)
+	if !ok {
 		return nil, fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
 	}
-	return k.Key.(KeyMAC).Sum(data)
+	return mac.Sum(data)
 }
 
 func (k *StrongSaltKey) MACVerify(tag []byte) (bool, error) {
-	if !k.Key.CanMAC() {
+	mac, ok := k.Key.(KeyMAC)
+	if !ok {
 		return false, fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
 	}
-	return k.Key.(KeyMAC).Verify(tag)
+	return mac.Verify(tag)
 }

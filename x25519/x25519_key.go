@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
@@ -94,7 +95,26 @@ type X25519KeyPriv struct {
 	pub *X25519KeyPub
 }
 
+func (k *X25519KeyPriv) generatePublic() (*X25519KeyPub, error) {
+	keySlice, err := curve25519.X25519(k.GetKey()[:], curve25519.Basepoint)
+	if err != nil {
+		return nil, err
+	}
+	var key [keyLength]byte
+	for i := 0; i < len(key); i++ {
+		key[i] = keySlice[i]
+	}
+	return &X25519KeyPub{&key}, nil
+}
+
 func (k *X25519KeyPriv) DecryptAsym(ciphertext []byte) ([]byte, error) {
+	if k.pub == nil {
+		pub, err := k.generatePublic()
+		if err != nil {
+			return nil, err
+		}
+		k.pub = pub
+	}
 	plaintext, ok := box.OpenAnonymous(nil, ciphertext, k.pub.GetKey(), k.GetKey())
 	if !ok {
 		return nil, fmt.Errorf("X25519 DecryptAsym open box returned false")
@@ -252,15 +272,11 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 }
 
 func (k *X25519Key) CanEncrypt() bool {
-	return k.pub != nil
+	return true
 }
 
 func (k *X25519Key) CanDecrypt() bool {
 	return true
-}
-
-func (k *X25519Key) CanMAC() bool {
-	return false
 }
 
 func (k *X25519Key) Encrypt(plaintext []byte) ([]byte, error) {

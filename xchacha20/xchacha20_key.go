@@ -110,10 +110,6 @@ func (k *XChaCha20Key) CanDecrypt() bool {
 	return true
 }
 
-func (k *XChaCha20Key) CanMAC() bool {
-	return false
-}
-
 func (k *XChaCha20Key) Encrypt(plaintext []byte) ([]byte, error) {
 	nonce := make([]byte, chacha20.NonceSizeX)
 	n, _ := rand.Read(nonce)
