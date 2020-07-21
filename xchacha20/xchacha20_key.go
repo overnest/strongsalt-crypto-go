@@ -79,7 +79,7 @@ func (k *XChaCha20Key) Deserialize(data []byte) (KeyBase, error) {
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 	switch ver {
 	case VERSION_ONE:
-		var keyLen uint16
+		var keyLen uint32
 		err = binary.Read(buf, binary.LittleEndian, &keyLen)
 		if err != nil {
 			return nil, err
