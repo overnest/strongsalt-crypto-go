@@ -17,6 +17,7 @@ type KeyMAC interface {
 	Write([]byte) (int, error)
 	Sum([]byte) ([]byte, error)
 	Verify([]byte) (bool, error)
+	Reset()
 }
 
 type KeyBase interface {

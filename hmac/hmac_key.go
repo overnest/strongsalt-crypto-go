@@ -213,3 +213,7 @@ func (k *HmacKey) Verify(tag []byte) (bool, error) {
 	}
 	return hmac.Equal(thisTag, tag), nil
 }
+
+func (k *HmacKey) Reset() {
+	k.hmac.Reset()
+}

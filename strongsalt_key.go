@@ -58,6 +58,10 @@ func deserializeKeyType(data []byte) (*KeyType, error) {
 	return keyType, nil
 }
 
+func TypeFromName(name string) *KeyType {
+	return typeMap[name]
+}
+
 /*
 ** VERSIONS
  */
@@ -244,4 +248,13 @@ func (k *StrongSaltKey) MACVerify(tag []byte) (bool, error) {
 		return false, fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
 	}
 	return mac.Verify(tag)
+}
+
+func (k *StrongSaltKey) MACReset() error {
+	mac, ok := k.Key.(KeyMAC)
+	if !ok {
+		return fmt.Errorf("Key of type %v is not a MAC key", k.Type.Name)
+	}
+	mac.Reset()
+	return nil
 }
