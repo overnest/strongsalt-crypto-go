@@ -13,10 +13,10 @@ import (
 )
 
 var typeNames []string = []string{
-	"Secretbox",
+	"SECRETBOX",
 	"X25519",
-	"XChaCha20",
-	"HMACSha512",
+	"XCHACHA20",
+	"HMAC-SHA512",
 }
 
 func validateResponse(t *testing.T, key *ssc.StrongSaltKey, typeName string, resData *cryptoData) {
