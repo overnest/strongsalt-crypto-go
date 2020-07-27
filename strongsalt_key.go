@@ -150,7 +150,7 @@ func (k *StrongSaltKey) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	buf.Grow(version.VersionSerialSize + keyTypeLenSerialSize + len(k.Type.Name) + len(serialKey))
 	buf.Write(k.Version.GetVersion().Serialize())
-	err = binary.Write(buf, binary.LittleEndian, uint16(len(k.Type.Name)))
+	err = binary.Write(buf, binary.BigEndian, uint16(len(k.Type.Name)))
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func DeserializeKey(data []byte) (*StrongSaltKey, error) {
 	case VERSION_ONE:
 		keyTypeLenBytes := make([]byte, keyTypeLenSerialSize)
 		buf.Read(keyTypeLenBytes)
-		keyTypeLen := binary.LittleEndian.Uint16(keyTypeLenBytes)
+		keyTypeLen := binary.BigEndian.Uint16(keyTypeLenBytes)
 		keyTypeBytes := make([]byte, keyTypeLen)
 		n, err := buf.Read(keyTypeBytes)
 		if err != nil {

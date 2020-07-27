@@ -192,7 +192,7 @@ func (k *X25519Key) Serialize() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = binary.Write(buf, binary.LittleEndian, int32(len(priv)))
+	err = binary.Write(buf, binary.BigEndian, int32(len(priv)))
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (k *X25519Key) Serialize() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = binary.Write(buf, binary.LittleEndian, int32(len(pub)))
+	err = binary.Write(buf, binary.BigEndian, int32(len(pub)))
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 	switch ver {
 	case VERSION_ONE:
 		var privKeyLen uint32
-		err = binary.Read(buf, binary.LittleEndian, &privKeyLen)
+		err = binary.Read(buf, binary.BigEndian, &privKeyLen)
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +242,7 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 		}
 
 		var pubKeyLen uint32
-		err = binary.Read(buf, binary.LittleEndian, &pubKeyLen)
+		err = binary.Read(buf, binary.BigEndian, &pubKeyLen)
 		if err != nil {
 			return nil, err
 		}

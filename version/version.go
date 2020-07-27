@@ -16,7 +16,7 @@ type Version int32
 
 func (v Version) Serialize() []byte {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, v.GetVersion())
+	binary.Write(buf, binary.BigEndian, v.GetVersion())
 	return buf.Bytes()
 }
 
@@ -57,7 +57,7 @@ func Deserialize(className string, data []byte) (VersionInterface, error) {
 	buf := bytes.NewBuffer(data)
 	//verNum, n, err := buf.ReadRune()
 	var verNum uint32
-	err := binary.Read(buf, binary.LittleEndian, &verNum)
+	err := binary.Read(buf, binary.BigEndian, &verNum)
 	if err != nil {
 		return nil, err
 	} /* else if n != VersionSerialSize {

@@ -128,7 +128,7 @@ func (k *HmacKey) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	ver := version.Serialize(k.version)
 	buf.Write(ver)
-	err := binary.Write(buf, binary.LittleEndian, uint16(len(k.HashType.Name)))
+	err := binary.Write(buf, binary.BigEndian, uint16(len(k.HashType.Name)))
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (k *HmacKey) Serialize() ([]byte, error) {
 	if n != len(hashType) {
 		return nil, fmt.Errorf("wrong number of bytes written when serializing hash type")
 	}
-	err = binary.Write(buf, binary.LittleEndian, k.KeyLen)
+	err = binary.Write(buf, binary.BigEndian, k.KeyLen)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 	case VERSION_ONE:
 		hashTypeLenBytes := make([]byte, hashTypeLenSerialSize)
 		buf.Read(hashTypeLenBytes)
-		hashTypeLen := binary.LittleEndian.Uint16(hashTypeLenBytes)
+		hashTypeLen := binary.BigEndian.Uint16(hashTypeLenBytes)
 		hashTypeBytes := make([]byte, hashTypeLen)
 		n, err := buf.Read(hashTypeBytes)
 		if err != nil {
@@ -181,7 +181,7 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 			return nil, err
 		}
 		var keyLen uint32
-		err = binary.Read(buf, binary.LittleEndian, &keyLen)
+		err = binary.Read(buf, binary.BigEndian, &keyLen)
 		if err != nil {
 			return nil, err
 		}

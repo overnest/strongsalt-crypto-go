@@ -83,7 +83,7 @@ func (k *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
 	switch ver {
 	case VERSION_ONE:
 		/*var keyLen uint16
-		err = binary.Read(buf, binary.LittleEndian, &keyLen)
+		err = binary.Read(buf, binary.BigEndian, &keyLen)
 		if err != nil {
 			return nil, err
 		}*/
@@ -136,6 +136,9 @@ func (k *SecretboxKey) Encrypt(plaintext []byte) ([]byte, error) {
 }
 
 func (k *SecretboxKey) Decrypt(ciphertext []byte) ([]byte, error) {
+	if len(ciphertext) < k.getNonceSize() {
+		return nil, fmt.Errorf("Ciphertext isn't long enough to contain nonce")
+	}
 	var nonce [nonceSizeV1]byte
 	for i := 0; i < len(nonce); i++ {
 		nonce[i] = ciphertext[i]
@@ -148,6 +151,13 @@ func (k *SecretboxKey) Decrypt(ciphertext []byte) ([]byte, error) {
 	}
 
 	return plaintext, nil
+}
+
+func (k *SecretboxKey) getNonceSize() int {
+	if k.version == VERSION_ONE {
+		return nonceSizeV1
+	}
+	return nonceSizeV1
 }
 
 func (k *SecretboxKey) GetKey() []byte {
