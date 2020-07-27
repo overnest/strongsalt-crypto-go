@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha512"
 	"encoding/binary"
 	"fmt"
 	"hash"
 
+	"github.com/overnest/strongsalt-crypto-go/hashtype"
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
 	"github.com/overnest/strongsalt-crypto-go/version"
 )
@@ -53,7 +53,7 @@ func init() {
 ** TYPES
  */
 
-type HashType struct {
+/*type HashType struct {
 	name     string
 	keyLen   uint32
 	hashFunc func() hash.Hash
@@ -78,18 +78,19 @@ var (
 	hashTypeMap map[string]*HashType = make(map[string]*HashType)
 
 	TypeSha512 *HashType = newHashType("sha512", 32, sha512.New)
-)
+)*/
 
 type HmacKey struct {
 	hmac     hash.Hash
-	HashType *HashType
+	HashType *hashtype.HashType
+	KeyLen   uint32
 	key      []byte
 	version  *HmacKeyVersion
 }
 
 func (k *HmacKey) GenerateKey() (KeyBase, error) {
 	hashType := k.HashType
-	key := make([]byte, hashType.keyLen)
+	key := make([]byte, k.KeyLen)
 	n, err := rand.Read(key)
 	if err != nil {
 		return nil, err
@@ -97,11 +98,12 @@ func (k *HmacKey) GenerateKey() (KeyBase, error) {
 	if n != len(key) {
 		return nil, fmt.Errorf("hmac generate key returned wrong number of bytes")
 	}
-	hmac := hmac.New(hashType.hashFunc, key)
+	hmac := hmac.New(hashType.HashFunc, key)
 	return &HmacKey{
 		hmac:     hmac,
 		HashType: hashType,
 		key:      key,
+		KeyLen:   k.KeyLen,
 		version:  curVersion,
 	}, nil
 }
@@ -126,18 +128,22 @@ func (k *HmacKey) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	ver := version.Serialize(k.version)
 	buf.Write(ver)
-	err := binary.Write(buf, binary.LittleEndian, uint16(len(k.HashType.name)))
+	err := binary.Write(buf, binary.LittleEndian, uint16(len(k.HashType.Name)))
 	if err != nil {
 		return nil, err
 	}
-	n, err := buf.WriteString(k.HashType.name)
+	hashType, err := k.HashType.Serialize()
 	if err != nil {
 		return nil, err
 	}
-	if n != len(k.HashType.name) {
+	n, err := buf.Write(hashType)
+	if err != nil {
+		return nil, err
+	}
+	if n != len(hashType) {
 		return nil, fmt.Errorf("wrong number of bytes written when serializing hash type")
 	}
-	err = binary.Write(buf, binary.LittleEndian, k.HashType.keyLen)
+	err = binary.Write(buf, binary.LittleEndian, k.KeyLen)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +160,7 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 	}
 	ver := genericVer.(*HmacKeyVersion)
 
-	var hashType *HashType
+	var hashType *hashtype.HashType
 	var key []byte
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 	switch ver {
@@ -170,7 +176,7 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 		if n != int(hashTypeLen) {
 			return nil, fmt.Errorf("read wrong number of bytes when deserializing hash type")
 		}
-		hashType, err = deserializeHashType(hashTypeBytes)
+		hashType, err = hashtype.DeserializeHashType(hashTypeBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -192,9 +198,10 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 	}
 	return &HmacKey{
 		key:      key,
+		KeyLen:   uint32(len(key)),
 		version:  ver,
 		HashType: hashType,
-		hmac:     hmac.New(hashType.hashFunc, key),
+		hmac:     hmac.New(hashType.HashFunc, key),
 	}, nil
 }
 

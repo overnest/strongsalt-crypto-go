@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/overnest/strongsalt-crypto-go/hashtype"
 	"github.com/overnest/strongsalt-crypto-go/hmac"
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
 	"github.com/overnest/strongsalt-crypto-go/secretbox"
@@ -29,7 +30,7 @@ var (
 	Type_Secretbox  = newKeyType("Secretbox", true, false, &secretbox.SecretboxKey{})
 	Type_X25519     = newKeyType("X25519", false, false, &x25519.X25519Key{})
 	Type_XChaCha20  = newKeyType("XChaCha20", true, true, &xchacha20.XChaCha20Key{})
-	Type_HMACSha512 = newKeyType("HMACSha512", false, false, &hmac.HmacKey{HashType: hmac.TypeSha512})
+	Type_HMACSha512 = newKeyType("HMACSha512", false, false, &hmac.HmacKey{HashType: hashtype.TypeSha512, KeyLen: 32})
 )
 
 type KeyType struct {
