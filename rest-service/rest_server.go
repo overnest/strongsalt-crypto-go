@@ -135,6 +135,7 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
+		return
 	}
 	key, err := ssc.DeserializeKey(serializedKey)
 	if err != nil {
@@ -142,6 +143,7 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
+		return
 	}
 
 	msg := validateReceived(reqData, key)
@@ -158,6 +160,7 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
+		return
 	}
 
 	resJson, err := json.Marshal(resData)
@@ -166,6 +169,7 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
+		return
 	}
 
 	w.Write(resJson)
@@ -207,6 +211,7 @@ func pullTransaction(w http.ResponseWriter, req *http.Request) {
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
+		return
 	}
 
 	transactionCount += 1
@@ -218,6 +223,7 @@ func pullTransaction(w http.ResponseWriter, req *http.Request) {
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
+		return
 	}
 
 	transactions[transactionCount] = key
