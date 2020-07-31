@@ -47,7 +47,13 @@ type SecretboxKey struct {
 	key     *[keySizeV1]byte
 }
 
-func (k *SecretboxKey) GenerateKey() (KeyBase, error) {
+func (_ *SecretboxKey) New() KeySymmetric {
+	return &SecretboxKey{
+		version: curVersion,
+	}
+}
+
+func (_ *SecretboxKey) GenerateKey() (KeyBase, error) {
 	keySlice := make([]byte, keySizeV1)
 	n, err := rand.Read(keySlice)
 	if err != nil {
@@ -72,7 +78,19 @@ func (k *SecretboxKey) GenerateKey() (KeyBase, error) {
 //  -------------------------
 //
 
-func (k *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
+func (k *SecretboxKey) SetKey(data []byte) error {
+	var key [keySizeV1]byte
+	for i := 0; i < len(key); i++ {
+		key[i] = data[i]
+	}
+	k.key = &key
+	return nil
+}
+
+func (_ *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
+	if len(data) < version.VersionSerialSize {
+		return nil, fmt.Errorf("Cannot deserialize version. Not enough bytes.")
+	}
 	versionBytes := data[:version.VersionSerialSize]
 	genericVer, err := version.Deserialize(versionTypeName, versionBytes)
 	if err != nil {
@@ -87,37 +105,48 @@ func (k *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
 		if err != nil {
 			return nil, err
 		}*/
-		keySlice := make([]byte, keySizeV1)
-		n, err := buf.Read(keySlice)
-		if err != nil {
-			return nil, err
+		result := &SecretboxKey{version: ver}
+		if buf.Len() > 0 {
+			keySlice := make([]byte, keySizeV1)
+			n, err := buf.Read(keySlice)
+			if err != nil {
+				return nil, err
+			}
+			if n != len(keySlice) {
+				return nil, fmt.Errorf("Read wrong number of bytes when deserializing key")
+			}
+			result.SetKey(keySlice)
 		}
-		if n != len(keySlice) {
-			return nil, fmt.Errorf("Read wrong number of bytes when deserializing key")
-		}
-		var key [keySizeV1]byte
-		for i := 0; i < len(key); i++ {
-			key[i] = keySlice[i]
-		}
-		return &SecretboxKey{key: &key, version: ver}, nil
+		return result, nil
 	default:
 		return nil, fmt.Errorf("Unknown key version %v", ver.GetVersion().GetVersion())
 	}
 }
 
-func (k *SecretboxKey) Serialize() ([]byte, error) {
-	ver := version.Serialize(k.version)
-	key := k.GetKey()
+func (k *SecretboxKey) SerializeMeta() ([]byte, error) {
+	return version.Serialize(k.version), nil
+}
 
-	return append(ver, key...), nil
+func (k *SecretboxKey) Serialize() ([]byte, error) {
+	meta, err := k.SerializeMeta()
+	if err != nil {
+		return nil, err
+	}
+	switch k.version {
+	case VERSION_ONE:
+		key := k.GetKey()
+		return append(meta, key...), nil
+	}
+
+	return nil, fmt.Errorf("Cannot serialize key with invalid version")
 }
 
 func (k *SecretboxKey) CanEncrypt() bool {
-	return true
+	return k.key != nil
 }
 
 func (k *SecretboxKey) CanDecrypt() bool {
-	return true
+	return k.key != nil
 }
 
 func (k *SecretboxKey) Encrypt(plaintext []byte) ([]byte, error) {
@@ -161,5 +190,17 @@ func (k *SecretboxKey) getNonceSize() int {
 }
 
 func (k *SecretboxKey) GetKey() []byte {
-	return k.key[:]
+	if k.key == nil {
+		return nil
+	} else {
+		return k.key[:]
+	}
+}
+
+func (k *SecretboxKey) KeyLen() int {
+	switch k.version {
+	case VERSION_ONE:
+		return keySizeV1
+	}
+	return 0
 }

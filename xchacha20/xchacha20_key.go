@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
-	"github.com/overnest/strongsalt-crypto-go/utils"
 	"github.com/overnest/strongsalt-crypto-go/version"
 	"golang.org/x/crypto/chacha20"
 )
@@ -45,6 +44,14 @@ func init() {
 type XChaCha20Key struct {
 	version *XChaCha20KeyVersion
 	key     []byte
+	keyLen  int
+}
+
+func (k *XChaCha20Key) New() KeySymmetric {
+	return &XChaCha20Key{
+		version: curVersion,
+		keyLen:  chacha20.KeySize,
+	}
 }
 
 func (k *XChaCha20Key) GenerateKey() (KeyBase, error) {
@@ -68,6 +75,12 @@ func (k *XChaCha20Key) GenerateKey() (KeyBase, error) {
 //  ------------------------------------------
 //
 
+func (k *XChaCha20Key) SetKey(data []byte) error {
+	k.key = data
+	k.keyLen = len(data)
+	return nil
+}
+
 func (k *XChaCha20Key) Deserialize(data []byte) (KeyBase, error) {
 	versionBytes := data[:version.VersionSerialSize]
 	genericVer, err := version.Deserialize(versionTypeName, versionBytes)
@@ -75,8 +88,10 @@ func (k *XChaCha20Key) Deserialize(data []byte) (KeyBase, error) {
 		return nil, err
 	}
 	ver := genericVer.(*XChaCha20KeyVersion)
-	var key []byte
+	result := &XChaCha20Key{version: ver}
+
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
+
 	switch ver {
 	case VERSION_ONE:
 		var keyLen uint32
@@ -84,30 +99,55 @@ func (k *XChaCha20Key) Deserialize(data []byte) (KeyBase, error) {
 		if err != nil {
 			return nil, err
 		}
-		key = make([]byte, keyLen)
-		n, err := buf.Read(key)
-		if err != nil {
-			return nil, err
-		}
-		if n != len(key) {
-			return nil, fmt.Errorf("Read wrong number of bytes when deserializing key")
+		result.keyLen = int(keyLen)
+		if buf.Len() > 0 {
+			if buf.Len() != int(keyLen) {
+				return nil, fmt.Errorf("Key length is %v but have %v bytes.", keyLen, buf.Len())
+			}
+			key := make([]byte, keyLen)
+			n, err := buf.Read(key)
+			if err != nil {
+				return nil, err
+			}
+			if n != len(key) {
+				return nil, fmt.Errorf("Read wrong number of bytes when deserializing key")
+			}
+			result.SetKey(key)
 		}
 	default:
 		return nil, fmt.Errorf("Unknown key version %v", ver.GetVersion().GetVersion())
 	}
-	return &XChaCha20Key{key: key, version: ver}, nil
+	return result, nil
+}
+
+func (k *XChaCha20Key) SerializeMeta() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	buf.Write(version.Serialize(k.version))
+	switch k.version {
+	case VERSION_ONE:
+		binary.Write(buf, binary.BigEndian, int32(len(k.GetKey())))
+	}
+	return buf.Bytes(), nil
 }
 
 func (k *XChaCha20Key) Serialize() ([]byte, error) {
-	return utils.KeySymmetricSerialize(k.GetKey(), version.Serialize(k.version))
+	meta, err := k.SerializeMeta()
+	if err != nil {
+		return nil, err
+	}
+	switch k.version {
+	case VERSION_ONE:
+		return append(meta, k.GetKey()...), nil
+	}
+	return nil, fmt.Errorf("Cannot serialize key with invalid version")
 }
 
 func (k *XChaCha20Key) CanEncrypt() bool {
-	return true
+	return k.key != nil
 }
 
 func (k *XChaCha20Key) CanDecrypt() bool {
-	return true
+	return k.key != nil
 }
 
 func (k *XChaCha20Key) Encrypt(plaintext []byte) ([]byte, error) {
@@ -128,6 +168,9 @@ func (k *XChaCha20Key) Encrypt(plaintext []byte) ([]byte, error) {
 }
 
 func (k *XChaCha20Key) Decrypt(ciphertext []byte) ([]byte, error) {
+	if len(ciphertext) < chacha20.NonceSizeX {
+		return nil, fmt.Errorf("Ciphertext is not long enough to contain nonce")
+	}
 	nonce := ciphertext[:chacha20.NonceSizeX]
 	ciphertext = ciphertext[chacha20.NonceSizeX:]
 
@@ -144,4 +187,8 @@ func (k *XChaCha20Key) Decrypt(ciphertext []byte) ([]byte, error) {
 
 func (k *XChaCha20Key) GetKey() []byte {
 	return k.key
+}
+
+func (k *XChaCha20Key) KeyLen() int {
+	return k.keyLen
 }

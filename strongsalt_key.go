@@ -112,6 +112,20 @@ type StrongSaltKey struct {
 	Key     KeyBase
 }
 
+func NewSymmetric(keyType *KeyType) (*StrongSaltKey, error) {
+	symmType, ok := keyType.Type.(KeySymmetric)
+	if !ok {
+		return nil, fmt.Errorf("Type %v does not implement KeySymmetric interface", keyType.Name)
+	}
+	key := symmType.New()
+
+	return &StrongSaltKey{
+		Version: curVersion,
+		Type:    keyType,
+		Key:     key,
+	}, nil
+}
+
 func GenerateKey(keyType *KeyType) (*StrongSaltKey, error) {
 	/*generateKey, exists := keyType.Type.MethodByName(generateKeyFuncName)
 	if !exists {
@@ -142,21 +156,47 @@ func GenerateKey(keyType *KeyType) (*StrongSaltKey, error) {
 // specified class.
 //
 
-func (k *StrongSaltKey) Serialize() ([]byte, error) {
-	serialKey, err := k.Key.Serialize()
-	if err != nil {
-		return nil, err
-	}
+func (k *StrongSaltKey) serialize(metaOnly bool) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	buf.Grow(version.VersionSerialSize + keyTypeLenSerialSize + len(k.Type.Name) + len(serialKey))
 	buf.Write(k.Version.GetVersion().Serialize())
-	err = binary.Write(buf, binary.BigEndian, uint16(len(k.Type.Name)))
-	if err != nil {
-		return nil, err
+
+	switch k.Version {
+	case VERSION_ONE:
+		err := binary.Write(buf, binary.BigEndian, uint16(len(k.Type.Name)))
+		if err != nil {
+			return nil, err
+		}
+		buf.WriteString(k.Type.Name)
+
+		var serialKey []byte
+		if metaOnly {
+			key, ok := k.Key.(KeySymmetric)
+			if !ok {
+				return nil, fmt.Errorf("Key does not implement KeySymmetric interface")
+			}
+			keyBytes, err := key.SerializeMeta()
+			if err != nil {
+				return nil, err
+			}
+			serialKey = keyBytes
+		} else {
+			keyBytes, err := k.Key.Serialize()
+			if err != nil {
+				return nil, err
+			}
+			serialKey = keyBytes
+		}
+		buf.Write(serialKey)
 	}
-	buf.WriteString(k.Type.Name)
-	buf.Write(serialKey)
 	return buf.Bytes(), nil
+}
+
+func (k *StrongSaltKey) SerializeMeta() ([]byte, error) {
+	return k.serialize(true)
+}
+
+func (k *StrongSaltKey) Serialize() ([]byte, error) {
+	return k.serialize(false)
 }
 
 func DeserializeKey(data []byte) (*StrongSaltKey, error) {
@@ -210,14 +250,14 @@ func DeserializeKey(data []byte) (*StrongSaltKey, error) {
 
 func (k *StrongSaltKey) Encrypt(plaintext []byte) ([]byte, error) {
 	if !k.Key.CanEncrypt() {
-		return nil, fmt.Errorf("Key of type %v cannot encrypt data", k.Type.Name)
+		return nil, fmt.Errorf("This key cannot encrypt data.")
 	}
 	return k.Key.(KeyEncryptDecrypt).Encrypt(plaintext)
 }
 
 func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
 	if !k.Key.CanDecrypt() {
-		return nil, fmt.Errorf("Key of type %v cannot decrypt data.", k.Type.Name)
+		return nil, fmt.Errorf("This key cannot decrypt data.")
 	}
 	return k.Key.(KeyEncryptDecrypt).Decrypt(ciphertext)
 }

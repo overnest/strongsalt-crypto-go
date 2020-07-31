@@ -28,6 +28,10 @@ type KeyBase interface {
 
 type KeySymmetric interface {
 	KeyBase
+	New() KeySymmetric
+	SetKey([]byte) error
+	SerializeMeta() ([]byte, error)
+	KeyLen() int
 	GetKey() []byte
 }
 
@@ -43,4 +47,11 @@ type KeyAsymmetric interface {
 	KeyBase
 	GetPublicKey() KeyPublic
 	GetPrivateKey() KeyPrivate
+}
+
+type KdfBase interface {
+	New() (KdfBase, error)
+	Serialize() ([]byte, error)
+	Deserialize([]byte) (KdfBase, error)
+	GenerateKey([]byte, int) ([]byte, error)
 }
