@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 
 	ssc "github.com/overnest/strongsalt-crypto-go"
+	"github.com/overnest/strongsalt-crypto-go/kdf"
 )
 
 const (
@@ -22,59 +24,54 @@ var (
 	transactions map[int]*ssc.StrongSaltKey = make(map[int]*ssc.StrongSaltKey)
 )
 
-/*type transaction struct {
-	key        *ssc.StrongSaltKey
-	plaintext  []byte
-	ciphertext []byte
-}*/
-
 type cryptoData struct {
-	Transaction int
-	Key         string
-	Plaintext   string
-	Ciphertext  string
-	MAC         string
+	Transaction int    `json:"transaction,omitempty"`
+	Password    string `json:"password,omitempty"`
+	SerialData  string `json:"key,omitempty"`
+	Plaintext   string `json:"plaintext,omitempty"`
+	Ciphertext  string `json:"ciphertext,omitempty"`
+	MAC         string `json:"mac,omitempty"`
 }
 
 func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 	ciphertext, err := base64.URLEncoding.DecodeString(reqData.Ciphertext)
 	if err != nil {
-		log.Printf("PUSH: Error decoding base64 ciphertext string: %v", err)
+		log.Printf("Error decoding base64 ciphertext string: %v", err)
 	}
 	if reqData.Plaintext != "" {
 		// plaintext means we want to decrypt
 		if !key.Key.CanDecrypt() {
-			return fmt.Sprintf("PUSH: deserialized key cannot decrypt, but request contains plaintext")
+			return fmt.Sprintf("deserialized key cannot decrypt, but request contains plaintext")
 		}
 		plaintext, err := key.Decrypt(ciphertext)
 		if err != nil {
-			return fmt.Sprintf("PUSH: Error decrypting ciphertext: %v", err)
+			return fmt.Sprintf("Error decrypting ciphertext: %v", err)
 		}
 		correctPlaintext, err := base64.URLEncoding.DecodeString(reqData.Plaintext)
 		if err != nil {
-			return fmt.Sprintf("PUSH: Error decoding base64 plaintext string: %v", err)
+			return fmt.Sprintf("Error decoding base64 plaintext string: %v", err)
 		}
 		if !bytes.Equal(plaintext, correctPlaintext) {
-			return fmt.Sprintf("PUSH: Decrypted ciphertext does not match given plaintext")
+			return fmt.Sprintf("Decrypted ciphertext does not match given plaintext")
 		}
 	} else {
 		// no plaintext means are are checking a MAC
 		if !key.CanMAC() {
-			return fmt.Sprintf("PUSH: key is not a MAC key, but no plaintext was given")
+			return fmt.Sprintf("key is not a MAC key, but no plaintext was given")
 		}
 		_, err := key.MACWrite(ciphertext)
 		if err != nil {
-			return fmt.Sprintf("PUSH: error writing data for MAC key: %v", err)
+			return fmt.Sprintf("error writing data for MAC key: %v", err)
 		}
 		mac, err := base64.URLEncoding.DecodeString(reqData.MAC)
 		if err != nil {
-			return fmt.Sprintf("PUSH: error decoding base64 MAC string: %v", err)
+			return fmt.Sprintf("error decoding base64 MAC string: %v", err)
 		}
 		ok, err := key.MACVerify(mac)
 		if err != nil {
-			return fmt.Sprintf("PUSH: error verifying MAC: %v", err)
+			return fmt.Sprintf("error verifying MAC: %v", err)
 		} else if !ok {
-			return fmt.Sprintf("PUSH: MAC verification returned false")
+			return fmt.Sprintf("MAC verification returned false")
 		}
 	}
 	return ""
@@ -87,7 +84,7 @@ func genCryptoData(key *ssc.StrongSaltKey) (*cryptoData, error) {
 	if err != nil {
 		return nil, err
 	}
-	data.Key = base64.URLEncoding.EncodeToString(serializedKey)
+	data.SerialData = base64.URLEncoding.EncodeToString(serializedKey)
 
 	message := make([]byte, 64*5)
 	rand.Read(message)
@@ -118,6 +115,20 @@ func genCryptoData(key *ssc.StrongSaltKey) (*cryptoData, error) {
 	return data, nil
 }
 
+func deserializeKdf(serializedKdf []byte, password string) (*ssc.StrongSaltKey, error) {
+	kdf, err := kdf.DeserializeKdf(serializedKdf)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := kdf.GenerateKey([]byte(password))
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
 func pushTransaction(w http.ResponseWriter, req *http.Request) {
 	reqData := &cryptoData{}
 
@@ -129,7 +140,7 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(msg))
 		return
 	}
-	serializedKey, err := base64.URLEncoding.DecodeString(reqData.Key)
+	serializedKey, err := base64.URLEncoding.DecodeString(reqData.SerialData)
 	if err != nil {
 		msg := fmt.Sprintf("PUSH: Error decoding base64 key string: %v", err)
 		log.Printf(msg)
@@ -137,17 +148,31 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(msg))
 		return
 	}
-	key, err := ssc.DeserializeKey(serializedKey)
-	if err != nil {
-		msg := fmt.Sprintf("PUSH: error deserializing key: %v", err)
-		log.Printf(msg)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(msg))
-		return
+	var key *ssc.StrongSaltKey
+
+	if reqData.Password != "" {
+		key, err = deserializeKdf(serializedKey, reqData.Password)
+		if err != nil {
+			msg := fmt.Sprintf("PUSH: Error deserializing KDF: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
+	} else {
+		key, err = ssc.DeserializeKey(serializedKey)
+		if err != nil {
+			msg := fmt.Sprintf("PUSH: error deserializing key: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
 	}
 
 	msg := validateReceived(reqData, key)
 	if msg != "" {
+		msg = "PUSH: " + msg
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
@@ -177,7 +202,8 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 
 func pullTransaction(w http.ResponseWriter, req *http.Request) {
 	var typeStruct struct {
-		Type string
+		KeyType string
+		KdfType string
 	}
 	err := json.NewDecoder(req.Body).Decode(&typeStruct)
 	if err != nil {
@@ -188,21 +214,55 @@ func pullTransaction(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	keyType := ssc.TypeFromName(typeStruct.Type)
+	keyType := ssc.TypeFromName(typeStruct.KeyType)
 	if keyType == nil {
-		msg := fmt.Sprintf("PULL: There is no key type named: %v", typeStruct.Type)
+		msg := fmt.Sprintf("PULL: There is no key type named: %v", typeStruct.KeyType)
 		log.Printf(msg)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
 		return
 	}
-	key, err := ssc.GenerateKey(keyType)
-	if err != nil {
-		msg := fmt.Sprintf("PULL: Error generating key of type %v: %v", typeStruct.Type, err)
-		log.Printf(msg)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(msg))
-		return
+	var key *ssc.StrongSaltKey
+	var sscKdf *kdf.StrongSaltKdf
+	var password string
+
+	if typeStruct.KdfType != "" {
+		kdfType := kdf.TypeFromName(typeStruct.KdfType)
+		if kdfType == nil {
+			msg := fmt.Sprintf("PULL: There is no kdf type named: %v", typeStruct.KdfType)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
+		sscKdf, err = kdf.New(kdfType, keyType)
+		if err != nil {
+			msg := fmt.Sprintf("PULL: New KDF Error: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
+		passNum, _ := rand.Int(rand.Reader, big.NewInt(1024))
+		password = "password" + passNum.String()
+
+		key, err = sscKdf.GenerateKey([]byte(password))
+		if err != nil {
+			msg := fmt.Sprintf("PULL: KDF generate key Error: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
+	} else {
+		key, err = ssc.GenerateKey(keyType)
+		if err != nil {
+			msg := fmt.Sprintf("PULL: Error generating key of type %v: %v", typeStruct.KeyType, err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
 	}
 
 	resData, err := genCryptoData(key)
@@ -212,6 +272,19 @@ func pullTransaction(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
 		return
+	}
+
+	if sscKdf != nil {
+		serialKdf, err := sscKdf.Serialize()
+		if err != nil {
+			msg := fmt.Sprintf("PULL: error serializing kdf: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
+		resData.SerialData = base64.URLEncoding.EncodeToString(serialKdf)
+		resData.Password = password
 	}
 
 	transactionCount += 1

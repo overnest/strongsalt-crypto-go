@@ -54,6 +54,12 @@ func (k *XChaCha20Key) New() KeySymmetric {
 	}
 }
 
+func (k *XChaCha20Key) SetKey(data []byte) error {
+	k.key = data
+	k.keyLen = len(data)
+	return nil
+}
+
 func (k *XChaCha20Key) GenerateKey() (KeyBase, error) {
 	key := make([]byte, chacha20.KeySize)
 	n, err := rand.Read(key)
@@ -63,7 +69,10 @@ func (k *XChaCha20Key) GenerateKey() (KeyBase, error) {
 	if n != len(key) {
 		return nil, fmt.Errorf("xchacha20 key received wrong number of random bytes")
 	}
-	return &XChaCha20Key{key: key, version: curVersion}, nil
+	result := &XChaCha20Key{version: curVersion}
+	result.SetKey(key)
+
+	return result, nil
 }
 
 //
@@ -74,12 +83,6 @@ func (k *XChaCha20Key) GenerateKey() (KeyBase, error) {
 // | version(4 bytes) | keyLen(4 bytes) | key |
 //  ------------------------------------------
 //
-
-func (k *XChaCha20Key) SetKey(data []byte) error {
-	k.key = data
-	k.keyLen = len(data)
-	return nil
-}
 
 func (k *XChaCha20Key) Deserialize(data []byte) (KeyBase, error) {
 	versionBytes := data[:version.VersionSerialSize]
@@ -143,11 +146,11 @@ func (k *XChaCha20Key) Serialize() ([]byte, error) {
 }
 
 func (k *XChaCha20Key) CanEncrypt() bool {
-	return k.key != nil
+	return k.key != nil && len(k.key) == k.KeyLen()
 }
 
 func (k *XChaCha20Key) CanDecrypt() bool {
-	return k.key != nil
+	return k.key != nil && len(k.key) == k.KeyLen()
 }
 
 func (k *XChaCha20Key) Encrypt(plaintext []byte) ([]byte, error) {

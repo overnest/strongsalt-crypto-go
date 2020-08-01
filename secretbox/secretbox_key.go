@@ -53,6 +53,15 @@ func (_ *SecretboxKey) New() KeySymmetric {
 	}
 }
 
+func (k *SecretboxKey) SetKey(data []byte) error {
+	var key [keySizeV1]byte
+	for i := 0; i < len(key); i++ {
+		key[i] = data[i]
+	}
+	k.key = &key
+	return nil
+}
+
 func (_ *SecretboxKey) GenerateKey() (KeyBase, error) {
 	keySlice := make([]byte, keySizeV1)
 	n, err := rand.Read(keySlice)
@@ -62,11 +71,10 @@ func (_ *SecretboxKey) GenerateKey() (KeyBase, error) {
 	if n != len(keySlice) {
 		return nil, fmt.Errorf("xchacha20 key received wrong number of random bytes")
 	}
-	var key [keySizeV1]byte
-	for i := 0; i < len(key); i++ {
-		key[i] = keySlice[i]
-	}
-	return &SecretboxKey{key: &key, version: curVersion}, nil
+	result := &SecretboxKey{version: curVersion}
+	result.SetKey(keySlice)
+
+	return result, nil
 }
 
 //
@@ -77,15 +85,6 @@ func (_ *SecretboxKey) GenerateKey() (KeyBase, error) {
 // | version(4 bytes) | key |
 //  -------------------------
 //
-
-func (k *SecretboxKey) SetKey(data []byte) error {
-	var key [keySizeV1]byte
-	for i := 0; i < len(key); i++ {
-		key[i] = data[i]
-	}
-	k.key = &key
-	return nil
-}
 
 func (_ *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
 	if len(data) < version.VersionSerialSize {

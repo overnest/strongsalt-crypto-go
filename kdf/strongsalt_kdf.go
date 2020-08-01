@@ -250,6 +250,14 @@ func DeserializeKdf(data []byte) (*StrongSaltKdf, error) {
 		if err != nil {
 			return nil, err
 		}
+		wrappedKey, ok := key.Key.(KeySymmetric)
+		if !ok {
+			return nil, fmt.Errorf("Deserializing KDF: Key type is not a symmetric key")
+		}
+		keyBytes := wrappedKey.GetKey()
+		if keyBytes != nil && len(keyBytes) > 0 {
+			return nil, fmt.Errorf("Deserializing KDF: Embedded key should not contain actual key bytes")
+		}
 		result.Key = key
 	default:
 		return nil, fmt.Errorf("Invalid kdf version: %v", ver.GetVersion())
