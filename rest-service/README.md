@@ -18,9 +18,17 @@ The general JSON format for sending data is the following, though not every fiel
 ## Keys
 
 ### Pushing a key generated on the client
-Generate a key in the client. If it is an encryption key, you will be sending the key, some plaintext, and the ciphertext.  
-If it is a MAC key, you will be sending the key, some ciphertext, and the MAC of the ciphertext.  
-Send to:  
+
+#### Symmetric Keys, Full Asymmetric Keys
+Generate a key in the client. Send the key, some plaintext, and the ciphertext.  
+
+#### Public key only for Asymmetric Keys
+Generate an asymmetric key in the client. Send a serialization of a StrongSaltKey which only includes the public key.
+
+#### MAC Keys
+Send the key, some ciphertext, and the MAC of the ciphertext.  
+
+Send one of the above to:  
 `http://localhost:8084/push`
 
 The server will validate the data you sent. It will respond with status code 500 if there is a problem.  
@@ -31,14 +39,25 @@ Choose a key type to test. The names of the key types can be found in `strongsal
 ```
 {
   "keyType": "XCHACHA20",
+  "publicOnly": boolean,
 }
 ```
 To:  
-`http://localhost:8084/pull`
+`http://localhost:8084/pull`  
 
-The server will respond with data for you to validate. Deserialize the key, and if it is an encryption key, decrypt the ciphertext and compare it to the plaintext. If it is a MAC key, generate a MAC from the given ciphertext and compare it to the given MAC.
+The response will depend on the type of key.
 
-Then create new data to send back to the server, using the same key. The initial response from the server contains a transaction number, which you must send back.  
+#### Symmetric and full Asymmetric keys
+Deserialize the key, and if it is an encryption key, decrypt the ciphertext and compare it to the plaintext.
+
+#### Asymmetric keys with publicOnly set to true
+Just deseralize the key.
+
+#### MAC Key
+Deserialize the key, generate a MAC from the given ciphertext, and compare it to the given MAC.
+
+### Responding to a pull
+Create new data to send back to the server, using the same key that was sent to you. The initial response from the server contains a transaction number, which you must send back.  
 Send this data to:  
 `http://localhost:8084/pullResponse`  
 The server will validate the data you sent, and if something doesn't work it will return status code 500.
@@ -65,7 +84,8 @@ To:
 
 The server will respond with data for you to validate. Deserialize the kdf, use the password to generate a key, decrypt the ciphertext and compare it to the plaintext.
 
-Then create new data to send back to the server, using the same key. The initial response from the server contains a transaction number, which you must send back.  
+### Responding to a pull
+Create new data to send back to the server, using the key that was sent to you. The initial response from the server contains a transaction number, which you must send back.  
 Send this data to:  
 `http://localhost:8084/pullResponse`  
 The server will validate the data you sent, and if something doesn't work it will return status code 500.
