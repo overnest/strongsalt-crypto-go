@@ -25,6 +25,10 @@ var symmetricKeyTypeNames []string = []string{
 	"SECRETBOX",
 }
 
+var asymmetricKeyTypeNames []string = []string{
+	"X25519",
+}
+
 var kdfTypeNames []string = []string{
 	"PBKDF2",
 }
@@ -128,6 +132,23 @@ func TestPushKeys(t *testing.T) {
 
 		validateResponse(t, key, typeName, resData)
 	}
+
+	for _, typeName := range asymmetricKeyTypeNames {
+		keyType := ssc.TypeFromName(typeName)
+		key, err := ssc.GenerateKey(keyType)
+		assert.NoError(t, err, typeName)
+
+		req := &cryptoData{}
+
+		keySerialization, err := key.SerializePublic()
+		assert.NoError(t, err, typeName)
+
+		req.SerialData = base64.URLEncoding.EncodeToString(keySerialization)
+
+		resData := sendPush(t, typeName, req)
+
+		validateResponse(t, key, typeName, resData)
+	}
 }
 
 func TestPushKdfs(t *testing.T) {
@@ -212,6 +233,30 @@ func TestPullKeys(t *testing.T) {
 		if t.Failed() {
 			return
 		}
+
+		transaction := resData.Transaction
+
+		sendPullResponse(t, transaction, key, typeName)
+	}
+
+	for _, typeName := range asymmetricKeyTypeNames {
+		var typeStruct struct {
+			KeyType    string
+			PublicOnly bool
+		}
+
+		typeStruct.KeyType = typeName
+		typeStruct.PublicOnly = true
+
+		reqJson, err := json.Marshal(typeStruct)
+		assert.NoError(t, err, typeName)
+
+		resData := sendPull(t, typeName, reqJson)
+
+		keySerialization, err := base64.URLEncoding.DecodeString(resData.SerialData)
+		assert.NoError(t, err, typeName)
+		key, err := ssc.DeserializeKey(keySerialization)
+		assert.NoError(t, err, typeName)
 
 		transaction := resData.Transaction
 

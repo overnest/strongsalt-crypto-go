@@ -54,7 +54,7 @@ func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 		if !bytes.Equal(plaintext, correctPlaintext) {
 			return fmt.Sprintf("Decrypted ciphertext does not match given plaintext")
 		}
-	} else {
+	} else if reqData.MAC != "" {
 		// no plaintext means are are checking a MAC
 		if !key.CanMAC() {
 			return fmt.Sprintf("key is not a MAC key, but no plaintext was given")
@@ -79,12 +79,6 @@ func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 
 func genCryptoData(key *ssc.StrongSaltKey) (*cryptoData, error) {
 	data := &cryptoData{}
-
-	serializedKey, err := key.Serialize()
-	if err != nil {
-		return nil, err
-	}
-	data.SerialData = base64.URLEncoding.EncodeToString(serializedKey)
 
 	message := make([]byte, 64*5)
 	rand.Read(message)
@@ -202,8 +196,9 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 
 func pullTransaction(w http.ResponseWriter, req *http.Request) {
 	var typeStruct struct {
-		KeyType string
-		KdfType string
+		KeyType    string
+		PublicOnly bool
+		KdfType    string
 	}
 	err := json.NewDecoder(req.Body).Decode(&typeStruct)
 	if err != nil {
@@ -265,13 +260,16 @@ func pullTransaction(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	resData, err := genCryptoData(key)
-	if err != nil {
-		msg := fmt.Sprintf("PULL: error generating data for response: %v", err)
-		log.Printf(msg)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(msg))
-		return
+	var resData *cryptoData
+	if !typeStruct.PublicOnly {
+		resData, err = genCryptoData(key)
+		if err != nil {
+			msg := fmt.Sprintf("PULL: error generating data for response: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
 	}
 
 	if sscKdf != nil {
@@ -285,6 +283,27 @@ func pullTransaction(w http.ResponseWriter, req *http.Request) {
 		}
 		resData.SerialData = base64.URLEncoding.EncodeToString(serialKdf)
 		resData.Password = password
+	} else if typeStruct.PublicOnly {
+		resData = &cryptoData{}
+		serializedKey, err := key.SerializePublic()
+		if err != nil {
+			msg := fmt.Sprintf("PULL: error serializing public key: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
+		resData.SerialData = base64.URLEncoding.EncodeToString(serializedKey)
+	} else {
+		serializedKey, err := key.Serialize()
+		if err != nil {
+			msg := fmt.Sprintf("PULL: error serializing key: %v", err)
+			log.Printf(msg)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(msg))
+			return
+		}
+		resData.SerialData = base64.URLEncoding.EncodeToString(serializedKey)
 	}
 
 	transactionCount += 1

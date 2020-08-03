@@ -181,30 +181,38 @@ func (k *X25519Key) GenerateKey() (KeyBase, error) {
 func (k *X25519Key) serialize(pubOnly bool) ([]byte, error) {
 	ver := version.Serialize(k.version)
 
-	pub, err := k.pub.Serialize()
-	if err != nil {
-		return nil, err
-	}
 	buf := new(bytes.Buffer)
-	_, err = buf.Write(ver)
+	_, err := buf.Write(ver)
 	if err != nil {
 		return nil, err
 	}
+
 	if pubOnly {
 		err = binary.Write(buf, binary.BigEndian, int32(0))
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		priv, err := k.priv.Serialize()
-		if err != nil {
-			return nil, err
+		var priv []byte
+		if k.priv != nil {
+			priv, err = k.priv.Serialize()
+			if err != nil {
+				return nil, err
+			}
 		}
 		err = binary.Write(buf, binary.BigEndian, int32(len(priv)))
 		if err != nil {
 			return nil, err
 		}
 		_, err = buf.Write(priv)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var pub []byte
+	if k.pub != nil {
+		pub, err = k.pub.Serialize()
 		if err != nil {
 			return nil, err
 		}
@@ -217,6 +225,7 @@ func (k *X25519Key) serialize(pubOnly bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return buf.Bytes(), nil
 }
 
