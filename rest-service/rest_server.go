@@ -73,6 +73,12 @@ func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 		} else if !ok {
 			return fmt.Sprintf("MAC verification returned false")
 		}
+	} else {
+		if !key.IsAsymmetric() {
+			return fmt.Sprintf("No plaintext or MAC was sent, but key is not an asymmetric key.")
+		} else if key.CanDecrypt() {
+			return fmt.Sprintf("No plaintext or MAC was sent, but key contains a private key.")
+		}
 	}
 	return ""
 }
