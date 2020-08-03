@@ -23,7 +23,7 @@ The general JSON format for sending data is the following, though not every fiel
 Generate a key in the client. Send the key, some plaintext, and the ciphertext.  
 
 #### Public key only for Asymmetric Keys
-Generate an asymmetric key in the client. Send a serialization of a StrongSaltKey which only includes the public key.
+All Asymmetric keys must be tested as full keys (containing the public and private keys) and with only the public key, as follows. Generate an asymmetric key in the client. Send a serialization of a StrongSaltKey which only includes the public key.
 
 #### MAC Keys
 Send the key, some ciphertext, and the MAC of the ciphertext.  
@@ -48,10 +48,10 @@ To:
 The response will depend on the type of key.
 
 #### Symmetric and full Asymmetric keys
-Deserialize the key, and if it is an encryption key, decrypt the ciphertext and compare it to the plaintext.
+Deserialize the key, decrypt the ciphertext and compare it to the plaintext. Set `publicOnly` to `false` to test a full asymmetric key.
 
 #### Asymmetric keys with publicOnly set to true
-Just deseralize the key.
+All Asymmetric keys must be tested twice, with `publicOnly` set to false and `publicOnly` set to true. When set to true just deseralize the key.
 
 #### MAC Key
 Deserialize the key, generate a MAC from the given ciphertext, and compare it to the given MAC.
