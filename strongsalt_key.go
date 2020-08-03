@@ -144,6 +144,34 @@ func GenerateKey(keyType *KeyType) (*StrongSaltKey, error) {
 	return &StrongSaltKey{keyType, curVersion, key}, nil
 }
 
+func (k *StrongSaltKey) IsSymmetric() bool {
+	_, ok := k.Key.(KeySymmetric)
+	return ok
+}
+
+func (k *StrongSaltKey) IsMidstream() bool {
+	_, ok := k.Key.(KeyMidstream)
+	return ok
+}
+
+func (k *StrongSaltKey) IsAsymmetric() bool {
+	_, ok := k.Key.(KeyAsymmetric)
+	return ok
+}
+
+func (k *StrongSaltKey) CanEncrypt() bool {
+	return k.Key.CanEncrypt()
+}
+
+func (k *StrongSaltKey) CanDecrypt() bool {
+	return k.Key.CanDecrypt()
+}
+
+func (k *StrongSaltKey) CanMAC() bool {
+	_, ok := k.Key.(KeyMAC)
+	return ok
+}
+
 // The serialization/deserialization format is as follows:
 //
 // Version 1:
@@ -276,10 +304,51 @@ func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
 	return k.Key.(KeyEncryptDecrypt).Decrypt(ciphertext)
 }
 
-func (k *StrongSaltKey) CanMAC() bool {
-	_, ok := k.Key.(KeyMAC)
-	return ok
+//
+// MIDSTREAM
+//
+
+func (k *StrongSaltKey) EncryptIC(plaintext []byte, nonce []byte, count uint32) ([]byte, error) {
+	if !k.Key.CanEncrypt() {
+		return nil, fmt.Errorf("This key cannot encrypt data.")
+	}
+	key, ok := k.Key.(KeyMidstream)
+	if !ok {
+		return nil, fmt.Errorf("This key cannot encrypt midstream")
+	}
+	return key.EncryptIC(plaintext, nonce, count)
 }
+
+func (k *StrongSaltKey) DecryptIC(ciphertext []byte, nonce []byte, count uint32) ([]byte, error) {
+	if !k.Key.CanDecrypt() {
+		return nil, fmt.Errorf("This key cannot decrypt data.")
+	}
+	key, ok := k.Key.(KeyMidstream)
+	if !ok {
+		return nil, fmt.Errorf("This key cannot decrypt midstream")
+	}
+	return key.DecryptIC(ciphertext, nonce, count)
+}
+
+func (k *StrongSaltKey) BlockSize() int {
+	key, ok := k.Key.(KeyMidstream)
+	if !ok {
+		return 0
+	}
+	return key.BlockSize()
+}
+
+func (k *StrongSaltKey) NonceSize() int {
+	key, ok := k.Key.(KeyMidstream)
+	if !ok {
+		return 0
+	}
+	return key.NonceSize()
+}
+
+//
+// MAC
+//
 
 func (k *StrongSaltKey) MACWrite(data []byte) (int, error) {
 	mac, ok := k.Key.(KeyMAC)

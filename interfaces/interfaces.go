@@ -35,6 +35,14 @@ type KeySymmetric interface {
 	GetKey() []byte
 }
 
+type KeyMidstream interface {
+	KeySymmetric
+	EncryptIC([]byte, []byte, uint32) ([]byte, error)
+	DecryptIC([]byte, []byte, uint32) ([]byte, error)
+	BlockSize() int
+	NonceSize() int
+}
+
 type KeyPublic interface {
 	EncryptAsym([]byte) ([]byte, error)
 }
@@ -45,6 +53,7 @@ type KeyPrivate interface {
 
 type KeyAsymmetric interface {
 	KeyBase
+	SerializePublic() ([]byte, error)
 	GetPublicKey() KeyPublic
 	GetPrivateKey() KeyPrivate
 }

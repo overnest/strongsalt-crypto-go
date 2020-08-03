@@ -13,6 +13,7 @@ import (
 
 const (
 	versionTypeName = "XChaCha20KeyVersion"
+	blockSizeV1     = 64
 )
 
 var (
@@ -160,27 +161,43 @@ func (k *XChaCha20Key) Encrypt(plaintext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("Generate nonce returned wrong number of bytes")
 	}
 
-	cipher, err := chacha20.NewUnauthenticatedCipher(k.GetKey(), nonce)
+	ciphertext, err := k.EncryptIC(plaintext, nonce, 0)
 	if err != nil {
-		return nil, fmt.Errorf("XChaCha20 New cipher error: %v", err)
+		return nil, err
 	}
-	ciphertext := make([]byte, len(plaintext))
-	cipher.XORKeyStream(ciphertext, plaintext)
 
 	return append(nonce, ciphertext...), nil
 }
 
+func (k *XChaCha20Key) EncryptIC(plaintext []byte, nonce []byte, count uint32) ([]byte, error) {
+	cipher, err := chacha20.NewUnauthenticatedCipher(k.GetKey(), nonce)
+	if err != nil {
+		return nil, fmt.Errorf("XChaCha20 New cipher error: %v", err)
+	}
+	cipher.SetCounter(count)
+
+	ciphertext := make([]byte, len(plaintext))
+	cipher.XORKeyStream(ciphertext, plaintext)
+
+	return ciphertext, nil
+}
+
 func (k *XChaCha20Key) Decrypt(ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) < chacha20.NonceSizeX {
-		return nil, fmt.Errorf("Ciphertext is not long enough to contain nonce")
+		return nil, fmt.Errorf("First bytes of ciphertext must contain nonce.")
 	}
 	nonce := ciphertext[:chacha20.NonceSizeX]
 	ciphertext = ciphertext[chacha20.NonceSizeX:]
 
+	return k.DecryptIC(ciphertext, nonce, 0)
+}
+
+func (k *XChaCha20Key) DecryptIC(ciphertext []byte, nonce []byte, count uint32) ([]byte, error) {
 	cipher, err := chacha20.NewUnauthenticatedCipher(k.GetKey(), nonce)
 	if err != nil {
 		return nil, fmt.Errorf("XChaCha20 new cipher error: %v", err)
 	}
+	cipher.SetCounter(count)
 
 	plaintext := make([]byte, len(ciphertext))
 	cipher.XORKeyStream(plaintext, ciphertext)
@@ -194,4 +211,20 @@ func (k *XChaCha20Key) GetKey() []byte {
 
 func (k *XChaCha20Key) KeyLen() int {
 	return k.keyLen
+}
+
+func (k *XChaCha20Key) BlockSize() int {
+	switch k.version {
+	case VERSION_ONE:
+		return blockSizeV1
+	}
+	return blockSizeV1
+}
+
+func (k *XChaCha20Key) NonceSize() int {
+	switch k.version {
+	case VERSION_ONE:
+		return chacha20.NonceSizeX
+	}
+	return chacha20.NonceSizeX
 }
