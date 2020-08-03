@@ -156,7 +156,7 @@ func GenerateKey(keyType *KeyType) (*StrongSaltKey, error) {
 // specified class.
 //
 
-func (k *StrongSaltKey) serialize(metaOnly bool) ([]byte, error) {
+func (k *StrongSaltKey) serialize(metaOnly bool, publicOnly bool) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	buf.Write(k.Version.GetVersion().Serialize())
 
@@ -179,6 +179,16 @@ func (k *StrongSaltKey) serialize(metaOnly bool) ([]byte, error) {
 				return nil, err
 			}
 			serialKey = keyBytes
+		} else if publicOnly {
+			key, ok := k.Key.(KeyAsymmetric)
+			if !ok {
+				return nil, fmt.Errorf("Key does not implement KeyAsymmetric interface")
+			}
+			keyBytes, err := key.SerializePublic()
+			if err != nil {
+				return nil, err
+			}
+			serialKey = keyBytes
 		} else {
 			keyBytes, err := k.Key.Serialize()
 			if err != nil {
@@ -192,11 +202,15 @@ func (k *StrongSaltKey) serialize(metaOnly bool) ([]byte, error) {
 }
 
 func (k *StrongSaltKey) SerializeMeta() ([]byte, error) {
-	return k.serialize(true)
+	return k.serialize(true, false)
+}
+
+func (k *StrongSaltKey) SerializePublic() ([]byte, error) {
+	return k.serialize(false, true)
 }
 
 func (k *StrongSaltKey) Serialize() ([]byte, error) {
-	return k.serialize(false)
+	return k.serialize(false, false)
 }
 
 func DeserializeKey(data []byte) (*StrongSaltKey, error) {

@@ -173,32 +173,41 @@ func (k *X25519Key) GenerateKey() (KeyBase, error) {
 //  ------------------------------------------------------------------------------
 // | version(4 bytes) | priKeyLen(4 bytes) | priKey | pubKeyLen(4 bytes) | pubKey |
 //  ------------------------------------------------------------------------------
+//
 // The public key field is optional. If there is no public key, then the pubKeyLen would be set to 0.
+// The private key is optional if SerializePublic is called, in which case privKeyLen is set to 0.
 //
 
-func (k *X25519Key) Serialize() ([]byte, error) {
+func (k *X25519Key) serialize(pubOnly bool) ([]byte, error) {
 	ver := version.Serialize(k.version)
-	priv, err := k.priv.Serialize()
-	if err != nil {
-		return nil, err
-	}
+
 	pub, err := k.pub.Serialize()
 	if err != nil {
 		return nil, err
 	}
 	buf := new(bytes.Buffer)
-	buf.Grow(len(ver) + privKeySerialLength + len(priv) + pubKeySerialLength + len(pub))
 	_, err = buf.Write(ver)
 	if err != nil {
 		return nil, err
 	}
-	err = binary.Write(buf, binary.BigEndian, int32(len(priv)))
-	if err != nil {
-		return nil, err
-	}
-	_, err = buf.Write(priv)
-	if err != nil {
-		return nil, err
+	if pubOnly {
+		err = binary.Write(buf, binary.BigEndian, int32(0))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		priv, err := k.priv.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		err = binary.Write(buf, binary.BigEndian, int32(len(priv)))
+		if err != nil {
+			return nil, err
+		}
+		_, err = buf.Write(priv)
+		if err != nil {
+			return nil, err
+		}
 	}
 	err = binary.Write(buf, binary.BigEndian, int32(len(pub)))
 	if err != nil {
@@ -211,6 +220,14 @@ func (k *X25519Key) Serialize() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (k *X25519Key) Serialize() ([]byte, error) {
+	return k.serialize(false)
+}
+
+func (k *X25519Key) SerializePublic() ([]byte, error) {
+	return k.serialize(true)
+}
+
 func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 	versionBytes := data[:version.VersionSerialSize]
 	genericVer, err := version.Deserialize(versionTypeName, versionBytes)
@@ -218,8 +235,9 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 		return nil, err
 	}
 	ver := genericVer.(*X25519KeyVersion)
-	var priv *X25519KeyPriv
-	var pub *X25519KeyPub
+
+	result := &X25519Key{version: ver}
+
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 	switch ver {
 	case VERSION_ONE:
@@ -228,17 +246,20 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 		if err != nil {
 			return nil, err
 		}
-		privBytes := make([]byte, privKeyLen)
-		n, err := buf.Read(privBytes)
-		if err != nil {
-			return nil, err
-		}
-		if n != len(privBytes) {
-			return nil, fmt.Errorf("Read wrong number of bytes when deserializing private key")
-		}
-		priv, err = DeserializePriv(privBytes)
-		if err != nil {
-			return nil, err
+		if privKeyLen > 0 {
+			privBytes := make([]byte, privKeyLen)
+			n, err := buf.Read(privBytes)
+			if err != nil {
+				return nil, err
+			}
+			if n != len(privBytes) {
+				return nil, fmt.Errorf("Read wrong number of bytes when deserializing private key")
+			}
+			priv, err := DeserializePriv(privBytes)
+			if err != nil {
+				return nil, err
+			}
+			result.priv = priv
 		}
 
 		var pubKeyLen uint32
@@ -248,35 +269,34 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 		}
 		if pubKeyLen > 0 {
 			pubBytes := make([]byte, pubKeyLen)
-			n, err = buf.Read(pubBytes)
+			n, err := buf.Read(pubBytes)
 			if err != nil {
 				return nil, err
 			}
 			if n != len(pubBytes) {
 				return nil, fmt.Errorf("Read wrong number of bytes when deserializing public key")
 			}
-			pub, err = DeserializePub(pubBytes)
-			priv.pub = pub
+			pub, err := DeserializePub(pubBytes)
 			if err != nil {
 				return nil, err
+			}
+			result.pub = pub
+			if result.priv != nil {
+				result.priv.pub = pub
 			}
 		}
 	default:
 		return nil, fmt.Errorf("Unknown key version %v", ver.GetVersion().GetVersion())
 	}
-	return &X25519Key{
-		priv:    priv,
-		pub:     pub,
-		version: ver,
-	}, nil
+	return result, nil
 }
 
 func (k *X25519Key) CanEncrypt() bool {
-	return true
+	return k.priv != nil || k.pub != nil
 }
 
 func (k *X25519Key) CanDecrypt() bool {
-	return true
+	return k.priv != nil
 }
 
 func (k *X25519Key) Encrypt(plaintext []byte) ([]byte, error) {
@@ -292,4 +312,12 @@ func (k *X25519Key) Encrypt(plaintext []byte) ([]byte, error) {
 
 func (k *X25519Key) Decrypt(ciphertext []byte) ([]byte, error) {
 	return k.priv.DecryptAsym(ciphertext)
+}
+
+func (k *X25519Key) GetPublicKey() KeyPublic {
+	return k.pub
+}
+
+func (k *X25519Key) GetPrivateKey() KeyPrivate {
+	return k.priv
 }
