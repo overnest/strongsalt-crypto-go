@@ -99,11 +99,6 @@ func (_ *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 	switch ver {
 	case VERSION_ONE:
-		/*var keyLen uint16
-		err = binary.Read(buf, binary.BigEndian, &keyLen)
-		if err != nil {
-			return nil, err
-		}*/
 		result := &SecretboxKey{version: ver}
 		if buf.Len() > 0 {
 			keySlice := make([]byte, keySizeV1)

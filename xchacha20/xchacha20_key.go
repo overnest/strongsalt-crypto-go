@@ -98,7 +98,7 @@ func (k *XChaCha20Key) Deserialize(data []byte) (KeyBase, error) {
 
 	switch ver {
 	case VERSION_ONE:
-		var keyLen uint32
+		var keyLen int32
 		err = binary.Read(buf, binary.BigEndian, &keyLen)
 		if err != nil {
 			return nil, err
@@ -169,12 +169,15 @@ func (k *XChaCha20Key) Encrypt(plaintext []byte) ([]byte, error) {
 	return append(nonce, ciphertext...), nil
 }
 
-func (k *XChaCha20Key) EncryptIC(plaintext []byte, nonce []byte, count uint32) ([]byte, error) {
+func (k *XChaCha20Key) EncryptIC(plaintext []byte, nonce []byte, count int32) ([]byte, error) {
+	if count < 0 {
+		return nil, fmt.Errorf("Initial counter cannot be less than 0.")
+	}
 	cipher, err := chacha20.NewUnauthenticatedCipher(k.GetKey(), nonce)
 	if err != nil {
 		return nil, fmt.Errorf("XChaCha20 New cipher error: %v", err)
 	}
-	cipher.SetCounter(count)
+	cipher.SetCounter(uint32(count))
 
 	ciphertext := make([]byte, len(plaintext))
 	cipher.XORKeyStream(ciphertext, plaintext)
@@ -192,12 +195,15 @@ func (k *XChaCha20Key) Decrypt(ciphertext []byte) ([]byte, error) {
 	return k.DecryptIC(ciphertext, nonce, 0)
 }
 
-func (k *XChaCha20Key) DecryptIC(ciphertext []byte, nonce []byte, count uint32) ([]byte, error) {
+func (k *XChaCha20Key) DecryptIC(ciphertext []byte, nonce []byte, count int32) ([]byte, error) {
+	if count < 0 {
+		return nil, fmt.Errorf("Initial counter cannot be less than 0.")
+	}
 	cipher, err := chacha20.NewUnauthenticatedCipher(k.GetKey(), nonce)
 	if err != nil {
 		return nil, fmt.Errorf("XChaCha20 new cipher error: %v", err)
 	}
-	cipher.SetCounter(count)
+	cipher.SetCounter(uint32(count))
 
 	plaintext := make([]byte, len(ciphertext))
 	cipher.XORKeyStream(plaintext, ciphertext)

@@ -50,40 +50,13 @@ func init() {
 }
 
 /*
-** TYPES
+** MAIN
  */
-
-/*type HashType struct {
-	name     string
-	keyLen   uint32
-	hashFunc func() hash.Hash
-}
-
-func newHashType(name string, keyLen uint32, hashFunc func() hash.Hash) *HashType {
-	hashType := &HashType{name, keyLen, hashFunc}
-	hashTypeMap[name] = hashType
-	return hashType
-}
-
-func deserializeHashType(data []byte) (*HashType, error) {
-	hashTypeName := string(data)
-	hashType, exists := hashTypeMap[hashTypeName]
-	if !exists {
-		return nil, fmt.Errorf("Cannot find hash type: %v.", hashTypeName)
-	}
-	return hashType, nil
-}
-
-var (
-	hashTypeMap map[string]*HashType = make(map[string]*HashType)
-
-	TypeSha512 *HashType = newHashType("sha512", 32, sha512.New)
-)*/
 
 type HmacKey struct {
 	hmac     hash.Hash
 	HashType *hashtype.HashType
-	KeyLen   uint32
+	KeyLen   int32
 	key      []byte
 	version  *HmacKeyVersion
 }
@@ -128,7 +101,7 @@ func (k *HmacKey) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	ver := version.Serialize(k.version)
 	buf.Write(ver)
-	err := binary.Write(buf, binary.BigEndian, uint16(len(k.HashType.Name)))
+	err := binary.Write(buf, binary.BigEndian, int16(len(k.HashType.Name)))
 	if err != nil {
 		return nil, err
 	}
@@ -165,9 +138,11 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 	switch ver {
 	case VERSION_ONE:
-		hashTypeLenBytes := make([]byte, hashTypeLenSerialSize)
-		buf.Read(hashTypeLenBytes)
-		hashTypeLen := binary.BigEndian.Uint16(hashTypeLenBytes)
+		var hashTypeLen int16
+		err := binary.Read(buf, binary.BigEndian, &hashTypeLen)
+		if err != nil {
+			return nil, err
+		}
 		hashTypeBytes := make([]byte, hashTypeLen)
 		n, err := buf.Read(hashTypeBytes)
 		if err != nil {
@@ -180,7 +155,7 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 		if err != nil {
 			return nil, err
 		}
-		var keyLen uint32
+		var keyLen int32
 		err = binary.Read(buf, binary.BigEndian, &keyLen)
 		if err != nil {
 			return nil, err
@@ -198,7 +173,7 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 	}
 	return &HmacKey{
 		key:      key,
-		KeyLen:   uint32(len(key)),
+		KeyLen:   int32(len(key)),
 		version:  ver,
 		HashType: hashType,
 		hmac:     hmac.New(hashType.HashFunc, key),

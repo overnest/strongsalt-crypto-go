@@ -56,7 +56,7 @@ func Serialize(ver VersionInterface) []byte {
 func Deserialize(className string, data []byte) (VersionInterface, error) {
 	buf := bytes.NewBuffer(data)
 	//verNum, n, err := buf.ReadRune()
-	var verNum uint32
+	var verNum int32
 	err := binary.Read(buf, binary.BigEndian, &verNum)
 	if err != nil {
 		return nil, err

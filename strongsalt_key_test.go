@@ -58,10 +58,10 @@ func TestXChaCha20(t *testing.T) {
 	nonce := ciphertext[:key.NonceSize()]
 	ciphertext = ciphertext[key.NonceSize():]
 
-	encryptedBlock, err := key.EncryptIC(plaintext[position:position+blockSize], nonce, uint32(blockNum))
+	encryptedBlock, err := key.EncryptIC(plaintext[position:position+blockSize], nonce, int32(blockNum))
 	assert.True(t, bytes.Equal(ciphertext[position:position+blockSize], encryptedBlock))
 
-	decryptedBlock, err := key.DecryptIC(ciphertext[position:position+blockSize], nonce, uint32(blockNum))
+	decryptedBlock, err := key.DecryptIC(ciphertext[position:position+blockSize], nonce, int32(blockNum))
 	assert.True(t, bytes.Equal(plaintext[position:position+blockSize], decryptedBlock))
 }
 

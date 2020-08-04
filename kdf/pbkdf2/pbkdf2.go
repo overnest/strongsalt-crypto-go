@@ -15,7 +15,7 @@ import (
 
 const (
 	versionTypeName = "Pbkdf2Version"
-	defaultIter     = uint32(100000)
+	defaultIter     = int32(100000)
 	defaultSaltLen  = 16
 )
 
@@ -61,7 +61,7 @@ type Pbkdf2 struct {
 	version  *Pbkdf2Version
 	hashType *hashtype.HashType
 	salt     []byte
-	iter     uint32
+	iter     int32
 	//keyLen   int
 }
 
@@ -115,7 +115,7 @@ func (_ *Pbkdf2) Deserialize(data []byte) (KdfBase, error) {
 		}
 		result.salt = salt
 
-		var iter uint32
+		var iter int32
 		err = binary.Read(buf, binary.BigEndian, &iter)
 		if err != nil {
 			return nil, err

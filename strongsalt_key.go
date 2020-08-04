@@ -190,7 +190,7 @@ func (k *StrongSaltKey) serialize(metaOnly bool, publicOnly bool) ([]byte, error
 
 	switch k.Version {
 	case VERSION_ONE:
-		err := binary.Write(buf, binary.BigEndian, uint16(len(k.Type.Name)))
+		err := binary.Write(buf, binary.BigEndian, int16(len(k.Type.Name)))
 		if err != nil {
 			return nil, err
 		}
@@ -257,9 +257,11 @@ func DeserializeKey(data []byte) (*StrongSaltKey, error) {
 	var key KeyBase
 	switch ver {
 	case VERSION_ONE:
-		keyTypeLenBytes := make([]byte, keyTypeLenSerialSize)
-		buf.Read(keyTypeLenBytes)
-		keyTypeLen := binary.BigEndian.Uint16(keyTypeLenBytes)
+		var keyTypeLen int16
+		err := binary.Read(buf, binary.BigEndian, &keyTypeLen)
+		if err != nil {
+			return nil, err
+		}
 		keyTypeBytes := make([]byte, keyTypeLen)
 		n, err := buf.Read(keyTypeBytes)
 		if err != nil {
@@ -308,7 +310,7 @@ func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
 // MIDSTREAM
 //
 
-func (k *StrongSaltKey) EncryptIC(plaintext []byte, nonce []byte, count uint32) ([]byte, error) {
+func (k *StrongSaltKey) EncryptIC(plaintext []byte, nonce []byte, count int32) ([]byte, error) {
 	if !k.Key.CanEncrypt() {
 		return nil, fmt.Errorf("This key cannot encrypt data.")
 	}
@@ -319,7 +321,7 @@ func (k *StrongSaltKey) EncryptIC(plaintext []byte, nonce []byte, count uint32) 
 	return key.EncryptIC(plaintext, nonce, count)
 }
 
-func (k *StrongSaltKey) DecryptIC(ciphertext []byte, nonce []byte, count uint32) ([]byte, error) {
+func (k *StrongSaltKey) DecryptIC(ciphertext []byte, nonce []byte, count int32) ([]byte, error) {
 	if !k.Key.CanDecrypt() {
 		return nil, fmt.Errorf("This key cannot decrypt data.")
 	}

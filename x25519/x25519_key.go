@@ -250,7 +250,7 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 	switch ver {
 	case VERSION_ONE:
-		var privKeyLen uint32
+		var privKeyLen int32
 		err = binary.Read(buf, binary.BigEndian, &privKeyLen)
 		if err != nil {
 			return nil, err
@@ -271,7 +271,7 @@ func (k *X25519Key) Deserialize(data []byte) (KeyBase, error) {
 			result.priv = priv
 		}
 
-		var pubKeyLen uint32
+		var pubKeyLen int32
 		err = binary.Read(buf, binary.BigEndian, &pubKeyLen)
 		if err != nil {
 			return nil, err

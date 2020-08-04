@@ -145,7 +145,7 @@ func (k *StrongSaltKdf) Serialize() ([]byte, error) {
 
 	switch k.Version {
 	case VERSION_ONE:
-		err = binary.Write(buf, binary.BigEndian, uint16(len(k.Type.Name)))
+		err = binary.Write(buf, binary.BigEndian, int16(len(k.Type.Name)))
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func (k *StrongSaltKdf) Serialize() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = binary.Write(buf, binary.BigEndian, uint16(len(kdfData)))
+		err = binary.Write(buf, binary.BigEndian, int16(len(kdfData)))
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +205,7 @@ func DeserializeKdf(data []byte) (*StrongSaltKdf, error) {
 
 	switch ver {
 	case VERSION_ONE:
-		var kdfTypeLen uint16
+		var kdfTypeLen int16
 		err = binary.Read(buf, binary.BigEndian, &kdfTypeLen)
 		if err != nil {
 			return nil, err
@@ -226,7 +226,7 @@ func DeserializeKdf(data []byte) (*StrongSaltKdf, error) {
 		}
 		result.Type = kdfType
 
-		var kdfDataLen uint16
+		var kdfDataLen int16
 		err = binary.Read(buf, binary.BigEndian, &kdfDataLen)
 		if err != nil {
 			return nil, err
