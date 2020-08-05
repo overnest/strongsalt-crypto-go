@@ -26,7 +26,7 @@ Generate a key in the client. Send the key, some plaintext, and the ciphertext.
 All Asymmetric keys must be tested as full keys (containing the public and private keys) and with only the public key, as follows. Generate an asymmetric key in the client. Send a serialization of a StrongSaltKey which only includes the public key.
 
 #### MAC Keys
-Send the key, some ciphertext, and the MAC of the ciphertext.  
+Send the key, some ciphertext, and the MAC of the ciphertext. Make sure the key is reset before using it to verify the new data given in the response.  
 
 Send one of the above to:  
 `http://localhost:8084/push`
@@ -54,7 +54,7 @@ Deserialize the key, decrypt the ciphertext and compare it to the plaintext. Set
 All Asymmetric keys must be tested twice, with `publicOnly` set to false and `publicOnly` set to true. When set to true just deseralize the key.
 
 #### MAC Key
-Deserialize the key, generate a MAC from the given ciphertext, and compare it to the given MAC.
+Deserialize the key, generate a MAC from the given ciphertext, and compare it to the given MAC. Make sure the MAC key is reset before using it with new data for the pull response.
 
 ### Responding to a pull
 Create new data to send back to the server, using the same key that was sent to you. The initial response from the server contains a transaction number, which you must send back.  

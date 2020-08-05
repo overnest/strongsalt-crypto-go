@@ -73,6 +73,8 @@ func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 		} else if !ok {
 			return fmt.Sprintf("MAC verification returned false")
 		}
+
+		key.MACReset()
 	} else {
 		if !key.IsAsymmetric() {
 			return fmt.Sprintf("No plaintext or MAC was sent, but key is not an asymmetric key.")
@@ -97,8 +99,6 @@ func genCryptoData(key *ssc.StrongSaltKey) (*cryptoData, error) {
 		}
 		data.Ciphertext = base64.URLEncoding.EncodeToString(ciphertext)
 	} else if key.CanMAC() {
-		key.MACReset()
-
 		data.Ciphertext = base64.URLEncoding.EncodeToString(message)
 
 		_, err := key.MACWrite(message)
@@ -322,6 +322,10 @@ func pullTransaction(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(msg))
 		return
+	}
+
+	if key.CanMAC() {
+		key.MACReset()
 	}
 
 	transactions[transactionCount] = key

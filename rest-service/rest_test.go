@@ -234,6 +234,10 @@ func TestPullKeys(t *testing.T) {
 			return
 		}
 
+		if key.CanMAC() {
+			key.MACReset()
+		}
+
 		transaction := resData.Transaction
 
 		sendPullResponse(t, transaction, key, typeName)
