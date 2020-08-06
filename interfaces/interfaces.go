@@ -37,6 +37,7 @@ type KeySymmetric interface {
 
 type KeyMidstream interface {
 	KeySymmetric
+	//GenerateNonce() ([]byte, error)
 	EncryptIC([]byte, []byte, int32) ([]byte, error)
 	DecryptIC([]byte, []byte, int32) ([]byte, error)
 	BlockSize() int

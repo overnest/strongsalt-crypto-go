@@ -85,7 +85,7 @@ func (k *HmacKey) GenerateKey() (KeyBase, error) {
 //
 // Version 1:
 //  -----------------------------------------------------------------------------
-// | version(4 bytes) | hashTypeLen(2 bytes) | hashType | keyLen(4 bytes) | key |
+// | version(4 bytes) | hashTypeLen(4 bytes) | hashType | keyLen(4 bytes) | key |
 //  -----------------------------------------------------------------------------
 //
 
@@ -101,7 +101,7 @@ func (k *HmacKey) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	ver := version.Serialize(k.version)
 	buf.Write(ver)
-	err := binary.Write(buf, binary.BigEndian, int16(len(k.HashType.Name)))
+	err := binary.Write(buf, binary.BigEndian, int32(len(k.HashType.Name)))
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (k *HmacKey) Deserialize(data []byte) (KeyBase, error) {
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 	switch ver {
 	case VERSION_ONE:
-		var hashTypeLen int16
+		var hashTypeLen int32
 		err := binary.Read(buf, binary.BigEndian, &hashTypeLen)
 		if err != nil {
 			return nil, err

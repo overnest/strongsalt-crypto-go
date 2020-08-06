@@ -122,9 +122,9 @@ func New(kdfType *KdfType, keyType *ssc.KeyType) (*StrongSaltKdf, error) {
 // The serialization/deserialization format is as follows:
 //
 // Version 1:
-//  --------------------------------------------------------------------------------------------------
-// | version(4 bytes) | kdfTypeLen(2 bytes) | kdfType | kdfDataLen(2 bytes) | kdfData | serializedKey |
-//  --------------------------------------------------------------------------------------------------
+//  ------------------------------------------------------------------------------------------------------------------
+// | version(4 bytes) | kdfTypeLen(4 bytes) | kdfType | kdfDataLen(4 bytes) | kdfData | keyDataLen(4 bytes) | keyData |
+//  ------------------------------------------------------------------------------------------------------------------
 //
 // For format of the "kdfData" portion will depend on the kdf type. Each kdf type
 // will be handled by a separate class, and the format will be defined in the
@@ -145,7 +145,7 @@ func (k *StrongSaltKdf) Serialize() ([]byte, error) {
 
 	switch k.Version {
 	case VERSION_ONE:
-		err = binary.Write(buf, binary.BigEndian, int16(len(k.Type.Name)))
+		err = binary.Write(buf, binary.BigEndian, int32(len(k.Type.Name)))
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func (k *StrongSaltKdf) Serialize() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = binary.Write(buf, binary.BigEndian, int16(len(kdfData)))
+		err = binary.Write(buf, binary.BigEndian, int32(len(kdfData)))
 		if err != nil {
 			return nil, err
 		}
@@ -174,6 +174,10 @@ func (k *StrongSaltKdf) Serialize() ([]byte, error) {
 		}
 
 		serializedKey, err := k.Key.SerializeMeta()
+		if err != nil {
+			return nil, err
+		}
+		err = binary.Write(buf, binary.BigEndian, int32(len(serializedKey)))
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +209,7 @@ func DeserializeKdf(data []byte) (*StrongSaltKdf, error) {
 
 	switch ver {
 	case VERSION_ONE:
-		var kdfTypeLen int16
+		var kdfTypeLen int32
 		err = binary.Read(buf, binary.BigEndian, &kdfTypeLen)
 		if err != nil {
 			return nil, err
@@ -226,7 +230,7 @@ func DeserializeKdf(data []byte) (*StrongSaltKdf, error) {
 		}
 		result.Type = kdfType
 
-		var kdfDataLen int16
+		var kdfDataLen int32
 		err = binary.Read(buf, binary.BigEndian, &kdfDataLen)
 		if err != nil {
 			return nil, err
@@ -246,7 +250,20 @@ func DeserializeKdf(data []byte) (*StrongSaltKdf, error) {
 		}
 		result.Kdf = kdf
 
-		key, err := ssc.DeserializeKey(buf.Bytes())
+		var keyDataLen int32
+		err = binary.Read(buf, binary.BigEndian, &keyDataLen)
+		if err != nil {
+			return nil, err
+		}
+		keyData := make([]byte, keyDataLen)
+		n, err = buf.Read(keyData)
+		if err != nil {
+			return nil, err
+		}
+		if n != len(keyData) {
+			return nil, fmt.Errorf("Wrong number of bytes read when deserializing key data")
+		}
+		key, err := ssc.DeserializeKey(keyData)
 		if err != nil {
 			return nil, err
 		}

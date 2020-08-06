@@ -3,6 +3,7 @@ package secretbox
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
@@ -81,9 +82,9 @@ func (_ *SecretboxKey) GenerateKey() (KeyBase, error) {
 // The serialization/deserialization format is as follows:
 //
 // Version 1:
-//  -------------------------
-// | version(4 bytes) | key |
-//  -------------------------
+//  ----------------------------------------------------
+// | version(4 bytes) | keyLen(4 bytes) | key(32 bytes) |
+//  ----------------------------------------------------
 //
 
 func (_ *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
@@ -100,7 +101,11 @@ func (_ *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
 	switch ver {
 	case VERSION_ONE:
 		result := &SecretboxKey{version: ver}
+		_ = buf.Next(4) // keyLen
 		if buf.Len() > 0 {
+			if buf.Len() != int(keySizeV1) {
+				return nil, fmt.Errorf("Key length is %v but have %v bytes.", keySizeV1, buf.Len())
+			}
 			keySlice := make([]byte, keySizeV1)
 			n, err := buf.Read(keySlice)
 			if err != nil {
@@ -118,7 +123,15 @@ func (_ *SecretboxKey) Deserialize(data []byte) (KeyBase, error) {
 }
 
 func (k *SecretboxKey) SerializeMeta() ([]byte, error) {
-	return version.Serialize(k.version), nil
+	ver := version.Serialize(k.version)
+	buf := bytes.NewBuffer(ver)
+	if k.version == VERSION_ONE {
+		err := binary.Write(buf, binary.BigEndian, int32(keySizeV1))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return buf.Bytes(), nil
 }
 
 func (k *SecretboxKey) Serialize() ([]byte, error) {

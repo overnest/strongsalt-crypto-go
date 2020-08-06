@@ -85,9 +85,9 @@ func (_ *Pbkdf2) New() (KdfBase, error) {
 // The serialization/deserialization format is as follows:
 //
 // Version 1:
-//  --------------------------------------------------------------
-// | version(4 bytes) | salt(16 bytes) | iter(4 bytes) | hashType |
-//  --------------------------------------------------------------
+//  ---------------------------------------------------------------------------------------------------------------------------
+// | version(4 bytes) | saltLen(4 bytes) | salt(16 bytes) | iterLen(4 bytes) | iter(4 bytes) | hashTypeLen(4 bytes) | hashType |
+//  ---------------------------------------------------------------------------------------------------------------------------
 //
 
 func (_ *Pbkdf2) Deserialize(data []byte) (KdfBase, error) {
@@ -105,7 +105,12 @@ func (_ *Pbkdf2) Deserialize(data []byte) (KdfBase, error) {
 	result := &Pbkdf2{}
 	switch ver {
 	case VERSION_ONE:
-		salt := make([]byte, 16)
+		var saltLen int32
+		err := binary.Read(buf, binary.BigEndian, &saltLen)
+		if err != nil {
+			return nil, err
+		}
+		salt := make([]byte, saltLen)
 		n, err := buf.Read(salt)
 		if err != nil {
 			return nil, err
@@ -115,6 +120,7 @@ func (_ *Pbkdf2) Deserialize(data []byte) (KdfBase, error) {
 		}
 		result.salt = salt
 
+		_ = buf.Next(4) // iterLen
 		var iter int32
 		err = binary.Read(buf, binary.BigEndian, &iter)
 		if err != nil {
@@ -122,7 +128,16 @@ func (_ *Pbkdf2) Deserialize(data []byte) (KdfBase, error) {
 		}
 		result.iter = iter
 
-		hashType, err := hashtype.DeserializeHashType(buf.Bytes())
+		var hashTypeLen int32
+		err = binary.Read(buf, binary.BigEndian, &hashTypeLen)
+		if err != nil {
+			return nil, err
+		}
+		hashTypeBytes := buf.Next(int(hashTypeLen))
+		if len(hashTypeBytes) != int(hashTypeLen) {
+			return nil, fmt.Errorf("wrong number of bytes read when deserializing hash type")
+		}
+		hashType, err := hashtype.DeserializeHashType(hashTypeBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -137,12 +152,26 @@ func (k *Pbkdf2) Serialize() ([]byte, error) {
 	case VERSION_ONE:
 		buf := bytes.NewBuffer(nil)
 		buf.Write(ver)
+
+		err := binary.Write(buf, binary.BigEndian, int32(len(k.salt)))
+		if err != nil {
+			return nil, err
+		}
 		buf.Write(k.salt)
-		err := binary.Write(buf, binary.BigEndian, k.iter)
+
+		err = binary.Write(buf, binary.BigEndian, int32(4))
+		if err != nil {
+			return nil, err
+		}
+		err = binary.Write(buf, binary.BigEndian, k.iter)
 		if err != nil {
 			return nil, err
 		}
 		hash, err := k.hashType.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		err = binary.Write(buf, binary.BigEndian, int32(len(hash)))
 		if err != nil {
 			return nil, err
 		}

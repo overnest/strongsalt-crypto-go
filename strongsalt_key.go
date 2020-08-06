@@ -175,9 +175,9 @@ func (k *StrongSaltKey) CanMAC() bool {
 // The serialization/deserialization format is as follows:
 //
 // Version 1:
-//  ---------------------------------------------------------
-// | version(4 bytes) | keyTypeLen(2 bytes) | keyType | data |
-//  ---------------------------------------------------------
+//  ----------------------------------------------------------------------------
+// | version(4 bytes) | keyTypeLen(4 bytes) | keyType | dataLen(4 bytes) | data |
+//  ----------------------------------------------------------------------------
 //
 // For format of the "data" portion will depend on the key type. Each key type
 // will be handled by a separate class, and the format will be defined in the
@@ -190,7 +190,7 @@ func (k *StrongSaltKey) serialize(metaOnly bool, publicOnly bool) ([]byte, error
 
 	switch k.Version {
 	case VERSION_ONE:
-		err := binary.Write(buf, binary.BigEndian, int16(len(k.Type.Name)))
+		err := binary.Write(buf, binary.BigEndian, int32(len(k.Type.Name)))
 		if err != nil {
 			return nil, err
 		}
@@ -223,6 +223,10 @@ func (k *StrongSaltKey) serialize(metaOnly bool, publicOnly bool) ([]byte, error
 				return nil, err
 			}
 			serialKey = keyBytes
+		}
+		err = binary.Write(buf, binary.BigEndian, int32(len(serialKey)))
+		if err != nil {
+			return nil, err
 		}
 		buf.Write(serialKey)
 	}
@@ -257,7 +261,7 @@ func DeserializeKey(data []byte) (*StrongSaltKey, error) {
 	var key KeyBase
 	switch ver {
 	case VERSION_ONE:
-		var keyTypeLen int16
+		var keyTypeLen int32
 		err := binary.Read(buf, binary.BigEndian, &keyTypeLen)
 		if err != nil {
 			return nil, err
@@ -274,7 +278,19 @@ func DeserializeKey(data []byte) (*StrongSaltKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		keyBytes := buf.Bytes()
+		var keyDataLen int32
+		err = binary.Read(buf, binary.BigEndian, &keyDataLen)
+		if err != nil {
+			return nil, err
+		}
+		keyBytes := make([]byte, keyDataLen)
+		n, err = buf.Read(keyBytes)
+		if err != nil {
+			return nil, err
+		}
+		if n != int(keyDataLen) {
+			return nil, fmt.Errorf("read wrong number of bytes when deserializing key data")
+		}
 		/*deserializeKeyFunc, exists := keyType.Type.MethodByName(deserializeKeyFuncName)
 		if !exists {
 			return nil, fmt.Errorf("key type %v does not have method %v", keyType.Name, deserializeKeyFuncName)
@@ -309,6 +325,12 @@ func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
 //
 // MIDSTREAM
 //
+
+//func (k *StrongSaltKey) EncryptStream(stream *io.ReadCloser) (*io.ReadCloser, error)
+// Calls k.key.generateNonce(), then k.key.EncryptIC
+
+//func (k *StrongSaltKey) DecryptStream(stream *io.ReadCloser, initialCount int32) (*io.ReadCloser, error)
+// pulls Nonce from beginning of stream, then uses k.key.DecryptIC
 
 func (k *StrongSaltKey) EncryptIC(plaintext []byte, nonce []byte, count int32) ([]byte, error) {
 	if !k.Key.CanEncrypt() {
