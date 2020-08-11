@@ -154,6 +154,20 @@ func (k *XChaCha20Key) CanDecrypt() bool {
 	return k.key != nil && len(k.key) == k.KeyLen()
 }
 
+func (k *XChaCha20Key) GenerateNonce() ([]byte, error) {
+	nonce := make([]byte, k.NonceSize())
+
+	n, err := rand.Read(nonce)
+	if err != nil {
+		return nil, err
+	}
+	if n != len(nonce) {
+		return nil, fmt.Errorf("Read wrong number of bytes when generating nonce")
+	}
+
+	return nonce, nil
+}
+
 func (k *XChaCha20Key) Encrypt(plaintext []byte) ([]byte, error) {
 	nonce := make([]byte, chacha20.NonceSizeX)
 	n, _ := rand.Read(nonce)
