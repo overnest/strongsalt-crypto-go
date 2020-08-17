@@ -326,11 +326,21 @@ func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
 // MIDSTREAM
 //
 
-//func (k *StrongSaltKey) EncryptStream(stream *io.ReadCloser) (*io.ReadCloser, error)
-// Calls k.key.generateNonce(), then k.key.EncryptIC
+func (k *StrongSaltKey) EncryptStream() (*Encryptor, error) {
+	key, ok := k.Key.(KeyMidstream)
+	if !ok {
+		return nil, fmt.Errorf("Cannot stream. Key does not implement KeyMidstream interface.")
+	}
+	return NewEncryptor(key)
+}
 
-//func (k *StrongSaltKey) DecryptStream(stream *io.ReadCloser, initialCount int32) (*io.ReadCloser, error)
-// pulls Nonce from beginning of stream, then uses k.key.DecryptIC
+func (k *StrongSaltKey) DecryptStream(initialCount int32) (*Decryptor, error) {
+	key, ok := k.Key.(KeyMidstream)
+	if !ok {
+		return nil, fmt.Errorf("Cannot stream. Key does not implement KeyMidstream interface.")
+	}
+	return NewDecryptor(key, initialCount)
+}
 
 func (k *StrongSaltKey) EncryptIC(plaintext []byte, nonce []byte, count int32) ([]byte, error) {
 	if !k.Key.CanEncrypt() {
