@@ -10,6 +10,8 @@ import (
 	"math/big"
 	"net/http"
 
+	"github.com/rs/cors"
+
 	ssc "github.com/overnest/strongsalt-crypto-go"
 	"github.com/overnest/strongsalt-crypto-go/kdf"
 )
@@ -140,6 +142,8 @@ func pushTransaction(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(msg))
 		return
 	}
+
+	fmt.Println("serial data: ", reqData.SerialData)
 	serializedKey, err := base64.URLEncoding.DecodeString(reqData.SerialData)
 	if err != nil {
 		msg := fmt.Sprintf("PUSH: Error decoding base64 key string: %v", err)
@@ -382,9 +386,11 @@ func main() {
 	mux := http.NewServeMux()
 	initializeMux(mux)
 
+	handler := cors.Default().Handler(mux)
+
 	server := &http.Server{
 		Addr:    address,
-		Handler: mux,
+		Handler: handler,
 	}
 	err := server.ListenAndServe()
 	if err != nil {
