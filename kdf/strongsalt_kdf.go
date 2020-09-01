@@ -7,6 +7,7 @@ import (
 
 	ssc "github.com/overnest/strongsalt-crypto-go"
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
+	argon2 "github.com/overnest/strongsalt-crypto-go/kdf/argon2"
 	"github.com/overnest/strongsalt-crypto-go/kdf/pbkdf2"
 	"github.com/overnest/strongsalt-crypto-go/version"
 )
@@ -23,6 +24,7 @@ const (
 
 var (
 	Type_Pbkdf2 = newKdfType("PBKDF2", &pbkdf2.Pbkdf2{})
+	Type_Argon2 = newKdfType("ARGON2", &argon2.Argon2{})
 )
 
 type KdfType struct {

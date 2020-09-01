@@ -31,6 +31,7 @@ var asymmetricKeyTypeNames []string = []string{
 
 var kdfTypeNames []string = []string{
 	"PBKDF2",
+	"ARGON2",
 }
 
 func validateResponse(t *testing.T, key *ssc.StrongSaltKey, typeName string, resData *cryptoData) {
