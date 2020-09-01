@@ -30,7 +30,7 @@ var (
 	Type_Secretbox  = newKeyType("SECRETBOX", true, false, &secretbox.SecretboxKey{})
 	Type_X25519     = newKeyType("X25519", false, false, &x25519.X25519Key{})
 	Type_XChaCha20  = newKeyType("XCHACHA20", true, true, &xchacha20.XChaCha20Key{})
-	Type_HMACSha512 = newKeyType("HMAC-SHA512", false, false, &hmac.HmacKey{HashType: hashtype.TypeSha512, KeyLen: 32})
+	Type_HMACSha512 = newKeyType("HMACSHA512", false, false, &hmac.HmacKey{HashType: hashtype.TypeSha512, KeyLen: 32})
 )
 
 type KeyType struct {
