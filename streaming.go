@@ -10,53 +10,9 @@ var (
 	ErrStreamClosed = fmt.Errorf("The stream is closed.")
 )
 
-/*
-Encryption:
-SDK they will want a stream they can write to
-When they write to the stream, it will be encrypted,
-    and the ciphertext will be sent to a MAC and the server
-
-SDK returns a Writer
-    - write to it, send to crypto client, read from crypto client
-        - crypto client encrypts full blocks, saves rest
-        - read only returns full blocks as a consequence
-        - if read anything, send to mac and server
-    - at close, send remaining bytes to crypto client, read from crypto client
-        - needs a readlast() method
-        - sent to mac, and server
-        - get final mac, send to server
-
-Crypto Client:
-    - write to it, save plaintext, encrypt full blocks (save rest)
-    - read returns whatever ciphertext is contained, up to argument
-	- readlast encrypts remaining plaintext,
-
-
-Decryption:
-SDK they will want a stream they can read from
-The stream will be an intermediary between the server and the customer
-
-SDK Reader:
-    - Read ciphertext from server (until end or at least full blocks greater than requested num bytes)
-    - IF SERVER EOF:
-        - computer final MAC, raise ERROR if fails
-    - write ciphertext to crypto client decryptor and mac
-        - crypto client decrypts full blocks, saves rest
-    - IF SERVER EOF:
-        - readlast() from crypto client
-    - ELSE:
-        - read request num bytes plaintext from crypto client
-
-Crypto Client Decryptor:
-    - Write ciphertext to crypto client, decrypt full blocks, save plaintext and rest of ciphertext
-    - Read returns requested number of plaintext bytes from the buffer
-    - readlast() decrypts remaining ciphertext and returns plaintext
-*/
-//func (k *StrongSaltKey) EncryptStream() (*io.WriteCloser, error)
-// Calls k.key.generateNonce(), then k.key.EncryptIC
-
-//func (k *StrongSaltKey) DecryptStream(stream *io.ReadCloser, initialCount int32) (*io.ReadCloser, error)
-// pulls Nonce from beginning of stream, then uses k.key.DecryptIC
+//
+// Encryptor
+//
 
 type Encryptor struct {
 	key        KeyMidstream
@@ -148,6 +104,10 @@ func (e *Encryptor) Close() error {
 	e.plaintext = nil
 	return nil
 }
+
+//
+// Decryptor
+//
 
 type Decryptor struct {
 	key        KeyMidstream
