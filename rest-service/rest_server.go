@@ -40,11 +40,15 @@ func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 	if err != nil {
 		log.Printf("Error decoding base64 ciphertext string: %v", err)
 	}
-	if reqData.Plaintext != "" {
+	if key.CanDecrypt() || reqData.Plaintext != "" {
 		// plaintext means we want to decrypt
-		if !key.Key.CanDecrypt() {
-			return fmt.Sprintf("deserialized key cannot decrypt, but request contains plaintext")
+		if reqData.Plaintext == "" {
+			return fmt.Sprintf("deserialized key can decrypt, but request contains no plaintext")
 		}
+		if !key.CanDecrypt() {
+			return fmt.Sprintf("deserialized key cannot decrypt, yet request contains plaintext")
+		}
+
 		plaintext, err := key.Decrypt(ciphertext)
 		if err != nil {
 			return fmt.Sprintf("Error decrypting ciphertext: %v", err)
@@ -56,11 +60,16 @@ func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 		if !bytes.Equal(plaintext, correctPlaintext) {
 			return fmt.Sprintf("Decrypted ciphertext does not match given plaintext")
 		}
-	} else if reqData.MAC != "" {
+	}
+	if key.CanMAC() || reqData.MAC != "" {
 		// no plaintext means are are checking a MAC
 		if !key.CanMAC() {
-			return fmt.Sprintf("key is not a MAC key, but no plaintext was given")
+			return fmt.Sprintf("key is not a MAC key, but a MAC was given")
 		}
+		if reqData.MAC == "" {
+			return fmt.Sprintf("key is a MAC key, but not MAC was given")
+		}
+
 		_, err := key.MACWrite(ciphertext)
 		if err != nil {
 			return fmt.Sprintf("error writing data for MAC key: %v", err)
@@ -77,7 +86,8 @@ func validateReceived(reqData *cryptoData, key *ssc.StrongSaltKey) string {
 		}
 
 		key.MACReset()
-	} else {
+	}
+	if reqData.Plaintext == "" && reqData.MAC == "" {
 		if !key.IsAsymmetric() {
 			return fmt.Sprintf("No plaintext or MAC was sent, but key is not an asymmetric key.")
 		} else if key.CanDecrypt() {
@@ -100,8 +110,12 @@ func genCryptoData(key *ssc.StrongSaltKey) (*cryptoData, error) {
 			return nil, err
 		}
 		data.Ciphertext = base64.URLEncoding.EncodeToString(ciphertext)
-	} else if key.CanMAC() {
-		data.Ciphertext = base64.URLEncoding.EncodeToString(message)
+		message = ciphertext
+	}
+	if key.CanMAC() {
+		if data.Ciphertext == "" {
+			data.Ciphertext = base64.URLEncoding.EncodeToString(message)
+		}
 
 		_, err := key.MACWrite(message)
 		if err != nil {

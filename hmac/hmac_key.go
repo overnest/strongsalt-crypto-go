@@ -97,6 +97,10 @@ func (k *HmacKey) CanDecrypt() bool {
 	return false
 }
 
+func (k *HmacKey) CanMAC() bool {
+	return k.hmac != nil
+}
+
 func (k *HmacKey) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	ver := version.Serialize(k.version)

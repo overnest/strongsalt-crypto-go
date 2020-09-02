@@ -27,10 +27,11 @@ const (
 var (
 	/*Type_X25519    = newKeyType("X25519", false, false, reflect.TypeOf(x25519.X25519Key{}))
 	Type_XChaCha20 = newKeyType("XChaCha20", true, true, reflect.TypeOf(xchacha20.XChaCha20Key{}))*/
-	Type_Secretbox  = newKeyType("SECRETBOX", true, false, &secretbox.SecretboxKey{})
-	Type_X25519     = newKeyType("X25519", false, false, &x25519.X25519Key{})
-	Type_XChaCha20  = newKeyType("XCHACHA20", true, true, &xchacha20.XChaCha20Key{})
-	Type_HMACSha512 = newKeyType("HMACSHA512", false, false, &hmac.HmacKey{HashType: hashtype.TypeSha512, KeyLen: 32})
+	Type_Secretbox     = newKeyType("SECRETBOX", true, false, &secretbox.SecretboxKey{})
+	Type_X25519        = newKeyType("X25519", false, false, &x25519.X25519Key{})
+	Type_XChaCha20     = newKeyType("XCHACHA20", true, true, &xchacha20.XChaCha20Key{})
+	Type_XChaCha20HMAC = newKeyType("XCHACHA20HMAC", true, true, &xchacha20.XChaCha20Key{Mac: true})
+	Type_HMACSha512    = newKeyType("HMACSHA512", false, false, &hmac.HmacKey{HashType: hashtype.TypeSha512, KeyLen: 32})
 )
 
 type KeyType struct {
@@ -168,8 +169,8 @@ func (k *StrongSaltKey) CanDecrypt() bool {
 }
 
 func (k *StrongSaltKey) CanMAC() bool {
-	_, ok := k.Key.(KeyMAC)
-	return ok
+	mac, ok := k.Key.(KeyMAC)
+	return ok && mac.CanMAC()
 }
 
 // The serialization/deserialization format is as follows:

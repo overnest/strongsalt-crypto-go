@@ -17,7 +17,8 @@ var keyTypeNames []string = []string{
 	"SECRETBOX",
 	"X25519",
 	"XCHACHA20",
-	"HMAC-SHA512",
+	"XCHACHA20HMAC",
+	"HMACSHA512",
 }
 
 var symmetricKeyTypeNames []string = []string{
@@ -50,7 +51,8 @@ func validateResponse(t *testing.T, key *ssc.StrongSaltKey, typeName string, res
 		ok, err := key.MACVerify(correctMAC)
 		assert.NoError(t, err, typeName)
 		assert.True(t, ok, typeName)
-	} else {
+	}
+	if key.CanDecrypt() {
 		assert.NotEmpty(t, resData.Plaintext, typeName)
 		correctPlaintext, err := base64.URLEncoding.DecodeString(resData.Plaintext)
 		assert.NoError(t, err, typeName)
@@ -78,8 +80,21 @@ func buildKeyRequest(t *testing.T, key *ssc.StrongSaltKey, typeName string) *cry
 	assert.Equal(t, len(message), n, typeName)
 	assert.NoError(t, err, typeName)
 
+	if key.CanEncrypt() {
+		assert.True(t, key.Key.CanEncrypt(), typeName)
+
+		req.Plaintext = base64.URLEncoding.EncodeToString(message)
+
+		ciphertext, err := key.Encrypt(message)
+		assert.NoError(t, err, typeName)
+
+		req.Ciphertext = base64.URLEncoding.EncodeToString(ciphertext)
+		message = ciphertext
+	}
 	if key.CanMAC() {
-		req.Ciphertext = base64.URLEncoding.EncodeToString(message)
+		if req.Ciphertext == "" {
+			req.Ciphertext = base64.URLEncoding.EncodeToString(message)
+		}
 
 		n, err := key.MACWrite(message)
 		assert.Equal(t, len(message), n, typeName)
@@ -89,15 +104,6 @@ func buildKeyRequest(t *testing.T, key *ssc.StrongSaltKey, typeName string) *cry
 		assert.NoError(t, err, typeName)
 
 		req.MAC = base64.URLEncoding.EncodeToString(mac)
-	} else {
-		assert.True(t, key.Key.CanEncrypt(), typeName)
-
-		req.Plaintext = base64.URLEncoding.EncodeToString(message)
-
-		ciphertext, err := key.Encrypt(message)
-		assert.NoError(t, err, typeName)
-
-		req.Ciphertext = base64.URLEncoding.EncodeToString(ciphertext)
 	}
 
 	return req

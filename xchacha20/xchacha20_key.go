@@ -2,10 +2,13 @@ package xchacha20
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"hash"
 
+	"github.com/overnest/strongsalt-crypto-go/hashtype"
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
 	"github.com/overnest/strongsalt-crypto-go/version"
 	"golang.org/x/crypto/chacha20"
@@ -45,7 +48,10 @@ func init() {
 type XChaCha20Key struct {
 	version *XChaCha20KeyVersion
 	key     []byte
+	encKey  []byte
 	keyLen  int
+	Mac     bool
+	hmac    hash.Hash
 }
 
 func (k *XChaCha20Key) New() KeySymmetric {
@@ -58,6 +64,24 @@ func (k *XChaCha20Key) New() KeySymmetric {
 func (k *XChaCha20Key) SetKey(data []byte) error {
 	k.key = data
 	k.keyLen = len(data)
+
+	switch k.version {
+	case VERSION_ONE:
+		if k.Mac {
+			keysHmac := hmac.New(hashtype.TypeSha256.HashFunc, data)
+
+			keysHmac.Write([]byte("encryption"))
+			k.encKey = keysHmac.Sum(nil)
+
+			keysHmac.Reset()
+			keysHmac.Write([]byte("mac"))
+			macKey := keysHmac.Sum(nil)
+
+			k.hmac = hmac.New(hashtype.TypeSha512.HashFunc, macKey)
+		} else {
+			k.encKey = data
+		}
+	}
 	return nil
 }
 
@@ -70,7 +94,7 @@ func (k *XChaCha20Key) GenerateKey() (KeyBase, error) {
 	if n != len(key) {
 		return nil, fmt.Errorf("xchacha20 key received wrong number of random bytes")
 	}
-	result := &XChaCha20Key{version: curVersion}
+	result := &XChaCha20Key{version: curVersion, Mac: k.Mac}
 	result.SetKey(key)
 
 	return result, nil
@@ -92,7 +116,7 @@ func (k *XChaCha20Key) Deserialize(data []byte) (KeyBase, error) {
 		return nil, err
 	}
 	ver := genericVer.(*XChaCha20KeyVersion)
-	result := &XChaCha20Key{version: ver}
+	result := &XChaCha20Key{version: ver, Mac: k.Mac}
 
 	buf := bytes.NewBuffer(data[version.VersionSerialSize:])
 
@@ -187,7 +211,7 @@ func (k *XChaCha20Key) EncryptIC(plaintext []byte, nonce []byte, count int32) ([
 	if count < 0 {
 		return nil, fmt.Errorf("Initial counter cannot be less than 0.")
 	}
-	cipher, err := chacha20.NewUnauthenticatedCipher(k.GetKey(), nonce)
+	cipher, err := chacha20.NewUnauthenticatedCipher(k.encKey, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("XChaCha20 New cipher error: %v", err)
 	}
@@ -213,7 +237,7 @@ func (k *XChaCha20Key) DecryptIC(ciphertext []byte, nonce []byte, count int32) (
 	if count < 0 {
 		return nil, fmt.Errorf("Initial counter cannot be less than 0.")
 	}
-	cipher, err := chacha20.NewUnauthenticatedCipher(k.GetKey(), nonce)
+	cipher, err := chacha20.NewUnauthenticatedCipher(k.encKey, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("XChaCha20 new cipher error: %v", err)
 	}
@@ -247,4 +271,41 @@ func (k *XChaCha20Key) NonceSize() int {
 		return chacha20.NonceSizeX
 	}
 	return chacha20.NonceSizeX
+}
+
+//
+// HMAC
+//
+
+func (k *XChaCha20Key) CanMAC() bool {
+	return k.Mac && k.hmac != nil
+}
+
+func (k *XChaCha20Key) Write(data []byte) (int, error) {
+	if !k.CanMAC() {
+		return 0, fmt.Errorf("This key cannot produce a MAC.")
+	}
+	return k.hmac.Write(data)
+}
+
+func (k *XChaCha20Key) Sum(data []byte) ([]byte, error) {
+	if !k.CanMAC() {
+		return nil, fmt.Errorf("This key cannot produce a MAC.")
+	}
+	return k.hmac.Sum(data), nil
+}
+
+func (k *XChaCha20Key) Verify(tag []byte) (bool, error) {
+	if !k.CanMAC() {
+		return false, fmt.Errorf("This key cannot produce a MAC.")
+	}
+	thisTag, err := k.Sum(nil)
+	if err != nil {
+		return false, err
+	}
+	return hmac.Equal(thisTag, tag), nil
+}
+
+func (k *XChaCha20Key) Reset() {
+	k.hmac.Reset()
 }

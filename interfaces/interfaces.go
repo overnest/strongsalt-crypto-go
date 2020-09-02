@@ -18,6 +18,7 @@ type KeyMAC interface {
 	Sum([]byte) ([]byte, error)
 	Verify([]byte) (bool, error)
 	Reset()
+	CanMAC() bool
 }
 
 type KeyBase interface {

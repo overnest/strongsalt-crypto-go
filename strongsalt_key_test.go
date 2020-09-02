@@ -27,16 +27,29 @@ func TestSecretbox(t *testing.T) {
 	assert.True(t, bytes.Equal(plaintext, decrypted))
 }
 
-func TestXChaCha20(t *testing.T) {
-	key, err := GenerateKey(Type_XChaCha20)
+func testXChaCha20(t *testing.T, hmac bool) {
+	var keyType *KeyType
+	if hmac {
+		keyType = Type_XChaCha20HMAC
+	} else {
+		keyType = Type_XChaCha20
+	}
+
+	key, err := GenerateKey(keyType)
 	assert.NoError(t, err)
 	assert.True(t, key.IsSymmetric())
 	assert.True(t, key.IsMidstream())
+	if hmac {
+		assert.True(t, key.CanMAC())
+	}
 
 	data, err := key.Serialize()
 	assert.NoError(t, err)
 	newKey, err := DeserializeKey(data)
 	assert.NoError(t, err)
+	if hmac {
+		assert.True(t, newKey.CanMAC())
+	}
 
 	blockSize := key.BlockSize()
 
@@ -47,6 +60,19 @@ func TestXChaCha20(t *testing.T) {
 
 	ciphertext, err := key.Encrypt(plaintext)
 	assert.NoError(t, err)
+
+	if hmac {
+		_, err = key.MACWrite(ciphertext)
+		assert.NoError(t, err)
+		mac, err := key.MACSum(nil)
+		assert.NoError(t, err)
+
+		_, err = newKey.MACWrite(ciphertext)
+		assert.NoError(t, err)
+		ok, err := newKey.MACVerify(mac)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+	}
 
 	decrypted, err := newKey.Decrypt(ciphertext)
 	assert.NoError(t, err)
@@ -63,6 +89,14 @@ func TestXChaCha20(t *testing.T) {
 
 	decryptedBlock, err := key.DecryptIC(ciphertext[position:position+blockSize], nonce, int32(blockNum))
 	assert.True(t, bytes.Equal(plaintext[position:position+blockSize], decryptedBlock))
+}
+
+func TestXChaCha20(t *testing.T) {
+	testXChaCha20(t, false)
+}
+
+func TestXChaCha20HMAC(t *testing.T) {
+	testXChaCha20(t, true)
 }
 
 func TestX25519(t *testing.T) {

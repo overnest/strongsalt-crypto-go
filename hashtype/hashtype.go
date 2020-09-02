@@ -1,6 +1,7 @@
 package hashtype
 
 import (
+	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
 	"hash"
@@ -14,6 +15,7 @@ type HashType struct {
 var (
 	hashTypeMap map[string]*HashType = make(map[string]*HashType)
 
+	TypeSha256 *HashType = newHashType("sha256", sha256.New)
 	TypeSha512 *HashType = newHashType("sha512", sha512.New)
 )
 
