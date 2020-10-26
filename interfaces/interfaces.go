@@ -65,4 +65,5 @@ type KdfBase interface {
 	Serialize() ([]byte, error)
 	Deserialize([]byte) (KdfBase, error)
 	GenerateKey([]byte, int) ([]byte, error)
+	GenerateBytes([]byte, []byte, int) ([]byte, error)
 }
