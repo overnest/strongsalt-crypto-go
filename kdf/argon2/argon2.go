@@ -25,6 +25,13 @@ const (
 var (
 	VERSION_ONE = newArgon2Version("ONE", 1)
 	curVersion  = VERSION_ONE
+
+	LoginKdfV1 = Argon2{
+		version: VERSION_ONE,
+		iter:    int32(3),
+		memory:  int32(64 * 1024),
+		threads: int32(1),
+	}
 )
 
 type Argon2Version struct {
@@ -188,5 +195,9 @@ func (k *Argon2) Serialize() ([]byte, error) {
 }
 
 func (k *Argon2) GenerateKey(password []byte, keyLen int) ([]byte, error) {
+	return argon2.IDKey(password, k.salt, uint32(k.iter), uint32(k.memory), uint8(k.threads), uint32(keyLen)), nil
+}
+
+func (k *Argon2) GenerateBytes(password []byte, salt []byte, keyLen int) ([]byte, error) {
 	return argon2.IDKey(password, k.salt, uint32(k.iter), uint32(k.memory), uint8(k.threads), uint32(keyLen)), nil
 }

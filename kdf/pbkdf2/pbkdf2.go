@@ -184,3 +184,7 @@ func (k *Pbkdf2) Serialize() ([]byte, error) {
 func (k *Pbkdf2) GenerateKey(password []byte, keyLen int) ([]byte, error) {
 	return pbkdf2.Key(password, k.salt, int(k.iter), keyLen, k.hashType.HashFunc), nil
 }
+
+func (k *Pbkdf2) GenerateBytes(password []byte, salt []byte, keyLen int) ([]byte, error) {
+	return pbkdf2.Key(password, salt, int(k.iter), keyLen, k.hashType.HashFunc), nil
+}
