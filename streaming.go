@@ -92,6 +92,7 @@ func (e *Encryptor) ReadLast() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	ciphertext = append(e.ciphertext, ciphertext...) // remaining ciphertext + encrypted
 
 	e.Close()
 
@@ -134,7 +135,10 @@ func (e *Decryptor) Write(p []byte) (n int, err error) {
 	if e.closed {
 		return n, ErrStreamClosed
 	}
-
+	if p == nil {
+		return
+	}
+	n = len(p)
 	nonceSize := e.key.NonceSize()
 	if len(e.nonce) < nonceSize {
 		diff := nonceSize - len(e.nonce)
@@ -146,15 +150,13 @@ func (e *Decryptor) Write(p []byte) (n int, err error) {
 		}
 		e.nonce = append(e.nonce, p[:pDiff]...)
 		p = p[pDiff:]
-		n = pDiff
 	}
 
-	if p == nil || len(p) == 0 || len(e.nonce) < nonceSize {
+	if len(p) == 0 {
 		return
 	}
 
 	e.ciphertext = append(e.ciphertext, p...)
-	n = len(p)
 
 	blockSize := e.key.BlockSize()
 	plaintextLen := (len(e.ciphertext) / blockSize) * blockSize
@@ -199,6 +201,7 @@ func (e *Decryptor) ReadLast() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	plaintext = append(e.plaintext, plaintext...) // remaining plaintext + decrypted
 
 	e.Close()
 
