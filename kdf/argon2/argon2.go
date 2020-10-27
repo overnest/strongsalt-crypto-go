@@ -179,5 +179,5 @@ func (k *Argon2) GenerateKey(password []byte, keyLen int) ([]byte, error) {
 }
 
 func (k *Argon2) GenerateBytes(password []byte, salt []byte, keyLen int) ([]byte, error) {
-	return argon2.IDKey(password, k.salt, uint32(k.iter), uint32(k.memory), uint8(defaultThreads), uint32(keyLen)), nil
+	return argon2.IDKey(password, salt, uint32(k.iter), uint32(k.memory), uint8(defaultThreads), uint32(keyLen)), nil
 }
