@@ -14,6 +14,7 @@ import (
 
 	ssc "github.com/overnest/strongsalt-crypto-go"
 	"github.com/overnest/strongsalt-crypto-go/kdf"
+	"github.com/overnest/strongsalt-crypto-go/pake/srp"
 )
 
 const (
@@ -24,6 +25,9 @@ var (
 	transactionCount = 0
 
 	transactions map[int]*ssc.StrongSaltKey = make(map[int]*ssc.StrongSaltKey)
+
+	srpVerifiers map[string]string = make(map[string]string) // userID -> verifierString
+	srpServers   map[string]string = make(map[string]string) // userID -> serverString
 )
 
 type cryptoData struct {
@@ -389,13 +393,175 @@ func pullResponse(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte(""))
 }
 
+func srpVerifier(w http.ResponseWriter, req *http.Request) {
+	var typeStruct struct {
+		UserID   string
+		Verifier string
+	}
+	err := json.NewDecoder(req.Body).Decode(&typeStruct)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/VERIFIER: Error decoding request json: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	_, _, err = srp.MakeSRPVerifier(typeStruct.Verifier)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/VERIFIER: Error decoding verifier string: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	srpVerifiers[typeStruct.UserID] = typeStruct.Verifier
+
+	w.Write([]byte(""))
+}
+
+func srpInit(w http.ResponseWriter, req *http.Request) {
+	var typeStruct struct {
+		Creds string
+	}
+	err := json.NewDecoder(req.Body).Decode(&typeStruct)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/INIT: Error decoding request json: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+
+	userID, A, err := srp.ServerBegin(typeStruct.Creds)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/INIT: Error decoding credentials string: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	verifierString, ok := srpVerifiers[userID]
+	if !ok {
+		msg := fmt.Sprintf("SRP/INIT: Cannot find verifier for userID: %v", userID)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	srpSession, verifier, err := srp.MakeSRPVerifier(verifierString)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/INIT: Error decoding verifier string: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	server, err := srpSession.NewServer(verifier, A)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/INIT: Error starting srp server: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	creds := server.Credentials()
+
+	serverString := server.Marshal()
+	srpServers[userID] = serverString
+
+	typeStruct.Creds = creds
+	resJson, err := json.Marshal(typeStruct)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/INIT: Error marshalling response json: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+
+	w.Write(resJson)
+}
+
+func srpProof(w http.ResponseWriter, req *http.Request) {
+	var typeStruct struct {
+		UserID string
+		Proof  string
+	}
+	err := json.NewDecoder(req.Body).Decode(&typeStruct)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/PROOF: Error decoding request json: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	serverString, ok := srpServers[typeStruct.UserID]
+	if !ok {
+		msg := fmt.Sprintf("SRP/PROOF: Cannot find saved server string for userID: %v", typeStruct.UserID)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	server, err := srp.UnmarshalServer(serverString)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/PROOF: Error unmarshalling server string: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+	serverProof, ok := server.ClientOk(typeStruct.Proof)
+	if !ok {
+		msg := fmt.Sprintf("SRP/PROOF: Error, client proof is not valid")
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+
+	var response struct {
+		Proof string
+	}
+	response.Proof = serverProof
+
+	resJson, err := json.Marshal(response)
+	if err != nil {
+		msg := fmt.Sprintf("SRP/PROOF: Error marshalling response json: %v", err)
+		log.Printf(msg)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(msg))
+		return
+	}
+
+	delete(srpVerifiers, typeStruct.UserID)
+	delete(srpServers, typeStruct.UserID)
+
+	w.Write(resJson)
+}
+
 func initializeMux(mux *http.ServeMux) error {
 	mux.HandleFunc("/push", pushTransaction)
 	mux.HandleFunc("/pull", pullTransaction)
 	mux.HandleFunc("/pullResponse", pullResponse)
+	mux.HandleFunc("/srp/verifier", srpVerifier)
+	mux.HandleFunc("/srp/init", srpInit)
+	mux.HandleFunc("/srp/proof", srpProof)
 	return nil
 }
 
+/*
+Client: send verifier
+Server: store verifier, respond if OK
+
+Client: send I,A
+Server: load server from verifier, send S, B
+
+Client: Send Proof
+Server: Verify Proof, send Proof
+
+Client: Verify Proof
+*/
 func main() {
 	mux := http.NewServeMux()
 	initializeMux(mux)

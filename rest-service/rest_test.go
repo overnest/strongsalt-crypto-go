@@ -10,6 +10,7 @@ import (
 
 	ssc "github.com/overnest/strongsalt-crypto-go"
 	"github.com/overnest/strongsalt-crypto-go/kdf"
+	"github.com/overnest/strongsalt-crypto-go/pake/srp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -310,4 +311,81 @@ func TestPullKdfs(t *testing.T) {
 			sendPullResponse(t, transaction, key, fullName)
 		}
 	}
+}
+
+func TestSRP(t *testing.T) {
+	srpSession, err := srp.NewFromVersion(1)
+	assert.NoError(t, err)
+
+	userID := "AliceBobberton"
+	password := "Password123"
+
+	verifier, err := srpSession.Verifier([]byte(userID), []byte(password))
+	assert.NoError(t, err)
+
+	srpUserID, verifierString := verifier.Encode()
+
+	var verifierReq struct {
+		UserID   string
+		Verifier string
+	}
+	verifierReq.UserID = srpUserID
+	verifierReq.Verifier = verifierString
+
+	verifierJson, err := json.Marshal(&verifierReq)
+	assert.NoError(t, err)
+
+	client := &http.Client{}
+
+	res, err := client.Post("http://"+address+"/srp/verifier", "application/json", bytes.NewReader(verifierJson))
+	assert.NoError(t, err)
+	assert.NotEqual(t, http.StatusInternalServerError, res.StatusCode)
+
+	srpClient, err := srpSession.NewClient([]byte(userID), []byte(password))
+	assert.NoError(t, err)
+
+	creds := srpClient.Credentials()
+
+	var initReq struct {
+		Creds string
+	}
+	initReq.Creds = creds
+
+	initJson, err := json.Marshal(&initReq)
+	assert.NoError(t, err)
+
+	res, err = client.Post("http://"+address+"/srp/init", "application/json", bytes.NewReader(initJson))
+	assert.NoError(t, err)
+	assert.NotEqual(t, http.StatusInternalServerError, res.StatusCode)
+
+	var initRes struct {
+		Creds string
+	}
+	err = json.NewDecoder(res.Body).Decode(&initRes)
+	assert.NoError(t, err)
+
+	proof, err := srpClient.Generate(initRes.Creds)
+	assert.NoError(t, err)
+
+	var proofReq struct {
+		UserID string
+		Proof  string
+	}
+	proofReq.UserID = srpUserID
+	proofReq.Proof = proof
+
+	proofJson, err := json.Marshal(&proofReq)
+	assert.NoError(t, err)
+
+	res, err = client.Post("http://"+address+"/srp/proof", "application/json", bytes.NewReader(proofJson))
+	assert.NoError(t, err)
+	assert.NotEqual(t, http.StatusInternalServerError, res.StatusCode)
+
+	var proofRes struct {
+		Proof string
+	}
+	err = json.NewDecoder(res.Body).Decode(&proofRes)
+	assert.NoError(t, err)
+
+	assert.True(t, srpClient.ServerOk(proofRes.Proof))
 }
