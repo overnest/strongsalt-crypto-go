@@ -251,7 +251,11 @@ func (s *SRP) Verifier(I, p []byte) (*Verifier, error) {
 	ph := s.hashbyte(p)
 	pf := s.pf
 	salt := randbytes(pf.n)
-	x := s.hashint(ih, ph, salt)
+	//x := s.hashint(ih, ph, salt)
+	x, err := s.genX(ph, salt)
+	if err != nil {
+		return nil, err
+	}
 	r := big.NewInt(0).Exp(pf.g, x, pf.N)
 
 	v := &Verifier{
@@ -452,7 +456,12 @@ func (c *Client) Generate(srv string) (string, error) {
 
 	// S := ((B - kg^x) ^ (a + ux)) % N
 
-	x := c.s.hashint(c.i, c.p, salt)
+	//x := c.s.hashint(c.i, c.p, salt)
+	x, err := c.s.genX(c.p, salt)
+	if err != nil {
+		return "", err
+	}
+
 	t0 := big.NewInt(0).Exp(pf.g, x, pf.N)
 	t0 = t0.Mul(t0, c.k)
 
@@ -685,6 +694,16 @@ func (s *SRP) hashint(a ...[]byte) *big.Int {
 	b := s.hashbyte(a...)
 	i.SetBytes(b)
 	return i
+}
+
+func (s *SRP) genX(password, salt []byte) (*big.Int, error) {
+	i := big.NewInt(0)
+	b, err := s.kdf.GenerateBytes(password, salt, 64)
+	if err != nil {
+		return nil, err
+	}
+	i.SetBytes(b)
+	return i, nil
 }
 
 func atoi(s string) int {
