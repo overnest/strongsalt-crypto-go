@@ -270,7 +270,7 @@ func (s *SRP) Verifier(I, p []byte) (*Verifier, error) {
 	return v, nil
 }
 
-func (s *SRP) SetVerifierID(v *Verifier, I []byte) {
+func (v *Verifier) SetID(s *SRP, I []byte) {
 	v.i = s.hashbyte(I)
 }
 
