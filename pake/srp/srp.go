@@ -270,6 +270,10 @@ func (s *SRP) Verifier(I, p []byte) (*Verifier, error) {
 	return v, nil
 }
 
+func (s *SRP) SetVerifierID(v *Verifier, I []byte) {
+	v.i = s.hashbyte(I)
+}
+
 // MakeSRPVerifier decodes the encoded verifier into an SRP environment
 // and Verifier instance. 'b' is an encoded verifier string previously
 // returned by Verifier.Encode().  A caller of this function uses the identity
