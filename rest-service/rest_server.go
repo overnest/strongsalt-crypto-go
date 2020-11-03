@@ -550,18 +550,6 @@ func initializeMux(mux *http.ServeMux) error {
 	return nil
 }
 
-/*
-Client: send verifier
-Server: store verifier, respond if OK
-
-Client: send I,A
-Server: load server from verifier, send S, B
-
-Client: Send Proof
-Server: Verify Proof, send Proof
-
-Client: Verify Proof
-*/
 func main() {
 	mux := http.NewServeMux()
 	initializeMux(mux)
