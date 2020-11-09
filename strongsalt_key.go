@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/overnest/strongsalt-crypto-go/aesgcm"
 
 	"github.com/overnest/strongsalt-crypto-go/hashtype"
 	"github.com/overnest/strongsalt-crypto-go/hmac"
@@ -32,6 +33,7 @@ var (
 	Type_XChaCha20     = newKeyType("XCHACHA20", true, true, &xchacha20.XChaCha20Key{})
 	Type_XChaCha20HMAC = newKeyType("XCHACHA20HMAC", true, true, &xchacha20.XChaCha20Key{Mac: true})
 	Type_HMACSha512    = newKeyType("HMACSHA512", false, false, &hmac.HmacKey{HashType: hashtype.TypeSha512, KeyLen: 32})
+	Type_AesGcm        = newKeyType("AESGCM", true, false, &aesgcm.AesGcmKey{})
 )
 
 type KeyType struct {
@@ -416,4 +418,12 @@ func (k *StrongSaltKey) MACReset() error {
 	}
 	mac.Reset()
 	return nil
+}
+
+func (k *StrongSaltKey) GetRawKey() ([]byte, error) {
+	key, ok := k.Key.(KeySymmetric)
+	if !ok {
+		return nil, fmt.Errorf("Key does not implement KeySymmetric interface")
+	}
+	return key.GetKey(), nil
 }

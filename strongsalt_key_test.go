@@ -180,3 +180,31 @@ func TestMAC(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, ok)
 }
+
+func TestAesGcm(t *testing.T) {
+	plaintext := []byte("dfadfja af8 ajdf adf0a fuda0df 0adjf88 d9fa0sdf afa233414 jdaf;")
+	key, err := GenerateKey(Type_AesGcm)
+	assert.NoError(t, err)
+
+	assert.True(t, key.IsSymmetric())
+
+	data, err := key.Serialize()
+	assert.NoError(t, err)
+	newKey, err := DeserializeKey(data)
+	assert.NoError(t, err)
+
+	ciphertext, err := key.Encrypt(plaintext)
+	assert.NoError(t, err)
+
+	decrypted, err := newKey.Decrypt(ciphertext)
+	assert.NoError(t, err)
+	assert.True(t,  bytes.Equal(plaintext, decrypted))
+
+	rawKey, err := key.GetRawKey()
+	assert.NoError(t, err)
+
+	newRawKey, err := newKey.GetRawKey()
+	assert.NoError(t, err)
+
+	assert.True(t,  bytes.Equal(rawKey, newRawKey))
+}
