@@ -67,12 +67,19 @@ func newUserDBVer(user, pass []byte, ver int32) (*userdb, error) {
 		return nil, err
 	}
 
-	v, err := s.Verifier(user, pass)
+	v, err := s.Verifier([]byte(""), pass)
 	if err != nil {
 		return nil, err
 	}
 
 	ih, vh := v.Encode()
+
+	s2, v, err := MakeSRPVerifier(vh)
+	if err != nil {
+		return nil, err
+	}
+	v.SetID(s2, user)
+	ih, vh = v.Encode()
 
 	db := &userdb{
 		s: s,

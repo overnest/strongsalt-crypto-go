@@ -19,7 +19,7 @@ func TestStreamingNonce(t *testing.T) {
 	assert.NoError(t, err)
 	decryptor, err := key.DecryptStream(0)
 	assert.NoError(t, err)
-	nonce := encryptor.nonce
+	nonce := encryptor.GetNonce()
 	blockSize := key.BlockSize()
 
 	plaintext := make([]byte, blockSize)

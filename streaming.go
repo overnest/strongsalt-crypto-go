@@ -99,6 +99,10 @@ func (e *Encryptor) ReadLast() ([]byte, error) {
 	return ciphertext, nil
 }
 
+func (e *Encryptor) GetNonce() []byte {
+	return e.nonce
+}
+
 func (e *Encryptor) Close() error {
 	e.closed = true
 	e.ciphertext = nil
