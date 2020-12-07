@@ -24,6 +24,7 @@ var keyTypeNames []string = []string{
 
 var symmetricKeyTypeNames []string = []string{
 	"XCHACHA20",
+	"XCHACHA20HMAC",
 	"SECRETBOX",
 }
 
@@ -96,6 +97,9 @@ func buildKeyRequest(t *testing.T, key *ssc.StrongSaltKey, typeName string) *cry
 		if req.Ciphertext == "" {
 			req.Ciphertext = base64.URLEncoding.EncodeToString(message)
 		}
+
+		err = key.MACReset()
+		assert.NoError(t, err, typeName)
 
 		n, err := key.MACWrite(message)
 		assert.Equal(t, len(message), n, typeName)

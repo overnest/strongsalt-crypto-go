@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	keyTypes []*ssc.KeyType = []*ssc.KeyType{ssc.Type_Secretbox, ssc.Type_XChaCha20}
+	keyTypes []*ssc.KeyType = []*ssc.KeyType{ssc.Type_Secretbox, ssc.Type_XChaCha20, ssc.Type_XChaCha20HMAC}
 	kdfTypes []*KdfType     = []*KdfType{Type_Pbkdf2, Type_Argon2}
 )
 

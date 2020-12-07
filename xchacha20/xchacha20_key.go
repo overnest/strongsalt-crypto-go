@@ -58,6 +58,7 @@ func (k *XChaCha20Key) New() KeySymmetric {
 	return &XChaCha20Key{
 		version: curVersion,
 		keyLen:  chacha20.KeySize,
+		Mac: k.Mac,
 	}
 }
 
