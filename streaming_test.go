@@ -2,6 +2,7 @@ package strongsaltcrypto
 
 import (
 	"crypto/rand"
+	"io/ioutil"
 	random "math/rand"
 	"testing"
 
@@ -25,8 +26,13 @@ func TestStreamingNonce(t *testing.T) {
 	plaintext := make([]byte, blockSize)
 	rand.Read(plaintext)
 	encryptor.Write(plaintext)
-	ciphertext, err := encryptor.ReadLast()
+	encryptor.CloseWrite()
+
+	ciphertext := make([]byte, len(plaintext)+5)
+	nC, err := encryptor.Read(ciphertext)
 	assert.NoError(t, err)
+	assert.Equal(t, len(plaintext), nC)
+	ciphertext = ciphertext[:nC]
 
 	firstHalfNonce := nonce[0 : len(nonce)/2]
 	secondHalfNonce := nonce[len(nonce)/2:]
@@ -38,9 +44,14 @@ func TestStreamingNonce(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(toBeWrite), n2)
 
-	encrypted, err := decryptor.ReadLast()
+	err = decryptor.CloseWrite()
 	assert.NoError(t, err)
-	assert.Equal(t, encrypted, plaintext)
+
+	decrypted := make([]byte, len(plaintext)+5)
+	n3, err := decryptor.Read(decrypted)
+	assert.NoError(t, err)
+	assert.Equal(t, len(plaintext), n3)
+	assert.Equal(t, decrypted[:n3], plaintext)
 }
 
 func TestStreamingBasic(t *testing.T) {
@@ -62,6 +73,8 @@ func TestStreamingBasic(t *testing.T) {
 	copy(originaltext, plaintext)
 
 	encryptor.Write(plaintext)
+	err = encryptor.CloseWrite()
+	assert.NoError(t, err)
 
 	buf1 := make([]byte, blockSize/2)
 	n1, err := encryptor.Read(buf1) // buffer size < available bytes
@@ -74,7 +87,7 @@ func TestStreamingBasic(t *testing.T) {
 	buf2 = buf2[0:n2] // truncate to real cipher
 	assert.NoError(t, err)
 
-	remainingCipher, err := encryptor.ReadLast()
+	remainingCipher, err := ioutil.ReadAll(encryptor)
 	assert.NoError(t, err)
 	assert.Equal(t, len(remainingCipher), 0)
 
@@ -84,9 +97,13 @@ func TestStreamingBasic(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, n, blockSize)
 
-	decrypted, err := decryptor.ReadLast()
-	assert.Equal(t, len(decrypted), blockSize)
-	assert.Equal(t, plaintext, decrypted)
+	err = decryptor.CloseWrite()
+	assert.NoError(t, err)
+
+	decrypted := make([]byte, blockSize+5)
+	n3, err := decryptor.Read(decrypted)
+	assert.Equal(t, blockSize, n3)
+	assert.Equal(t, plaintext, decrypted[:n3])
 }
 
 func TestStreamingAdvanced(t *testing.T) {
@@ -122,7 +139,10 @@ func TestStreamingAdvanced(t *testing.T) {
 		assert.NoError(t, err)
 		encrypted = append(encrypted, buf[0:n]...)
 	}
-	lastEncrypted, err := encryptor.ReadLast()
+	err = encryptor.CloseWrite()
+	assert.NoError(t, err)
+
+	lastEncrypted, err := ioutil.ReadAll(encryptor)
 	assert.NoError(t, err)
 	encrypted = append(encrypted, lastEncrypted...)
 	assert.Equal(t, len(encrypted), testPlaintextLen)
@@ -142,7 +162,11 @@ func TestStreamingAdvanced(t *testing.T) {
 		assert.NoError(t, err)
 		decrypted = append(decrypted, buf[0:n]...)
 	}
-	lastDecrypted, err := decryptor.ReadLast()
+	err = decryptor.CloseWrite()
+	assert.NoError(t, err)
+
+	//lastDecrypted, err := decryptor.ReadLast()
+	lastDecrypted, err := ioutil.ReadAll(decryptor)
 	assert.NoError(t, err)
 	decrypted = append(decrypted, lastDecrypted...)
 	assert.Equal(t, len(decrypted), testPlaintextLen)

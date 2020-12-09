@@ -2,6 +2,7 @@ package strongsaltcrypto
 
 import (
 	"fmt"
+	"io"
 
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
 )
@@ -15,12 +16,13 @@ var (
 //
 
 type Encryptor struct {
-	key        KeyMidstream
-	nonce      []byte
-	plaintext  []byte
-	ciphertext []byte
-	blockNum   int32
-	closed     bool
+	key         KeyMidstream
+	nonce       []byte
+	plaintext   []byte
+	ciphertext  []byte
+	blockNum    int32
+	closed      bool
+	writeClosed bool
 }
 
 func NewEncryptor(key KeyMidstream) (*Encryptor, error) {
@@ -40,7 +42,7 @@ func NewEncryptor(key KeyMidstream) (*Encryptor, error) {
 }
 
 func (e *Encryptor) Write(p []byte) (n int, err error) {
-	if e.closed {
+	if e.closed || e.writeClosed {
 		return n, ErrStreamClosed
 	}
 	if p == nil || len(p) == 0 {
@@ -73,6 +75,9 @@ func (e *Encryptor) Read(p []byte) (n int, err error) {
 	if e.closed {
 		return n, ErrStreamClosed
 	}
+	if len(e.ciphertext) == 0 && e.writeClosed {
+		return 0, io.EOF
+	}
 	if len(e.ciphertext) > len(p) {
 		n = len(p)
 	} else {
@@ -103,8 +108,28 @@ func (e *Encryptor) GetNonce() []byte {
 	return e.nonce
 }
 
+func (e *Encryptor) CloseWrite() error {
+	if e.closed {
+		return ErrStreamClosed
+	}
+
+	ciphertext, err := e.key.EncryptIC(e.plaintext, e.nonce, e.blockNum)
+	if err != nil {
+		return err
+	}
+
+	e.ciphertext = append(e.ciphertext, ciphertext...)
+	e.plaintext = nil
+	e.blockNum += int32(len(ciphertext) / e.key.BlockSize())
+
+	e.writeClosed = true
+
+	return nil
+}
+
 func (e *Encryptor) Close() error {
 	e.closed = true
+	e.writeClosed = true
 	e.ciphertext = nil
 	e.plaintext = nil
 	return nil
@@ -115,12 +140,13 @@ func (e *Encryptor) Close() error {
 //
 
 type Decryptor struct {
-	key        KeyMidstream
-	nonce      []byte
-	plaintext  []byte
-	ciphertext []byte
-	blockNum   int32
-	closed     bool
+	key         KeyMidstream
+	nonce       []byte
+	plaintext   []byte
+	ciphertext  []byte
+	blockNum    int32
+	closed      bool
+	writeClosed bool
 }
 
 func NewDecryptor(key KeyMidstream, ic int32) (*Decryptor, error) {
@@ -136,7 +162,7 @@ func NewDecryptor(key KeyMidstream, ic int32) (*Decryptor, error) {
 }
 
 func (e *Decryptor) Write(p []byte) (n int, err error) {
-	if e.closed {
+	if e.closed || e.writeClosed {
 		return n, ErrStreamClosed
 	}
 	if p == nil {
@@ -186,6 +212,9 @@ func (e *Decryptor) Read(p []byte) (n int, err error) {
 	if e.closed {
 		return n, ErrStreamClosed
 	}
+	if len(e.plaintext) == 0 && e.writeClosed {
+		return 0, io.EOF
+	}
 	if len(e.plaintext) > len(p) {
 		n = len(p)
 	} else {
@@ -212,8 +241,24 @@ func (e *Decryptor) ReadLast() ([]byte, error) {
 	return plaintext, nil
 }
 
+func (e *Decryptor) CloseWrite() error {
+	plaintext, err := e.key.DecryptIC(e.ciphertext, e.nonce, e.blockNum)
+	if err != nil {
+		return err
+	}
+
+	e.plaintext = append(e.plaintext, plaintext...)
+	e.ciphertext = nil
+	e.blockNum += int32(len(plaintext) / e.key.BlockSize())
+
+	e.writeClosed = true
+
+	return nil
+}
+
 func (e *Decryptor) Close() error {
 	e.closed = true
+	e.writeClosed = true
 	e.ciphertext = nil
 	e.plaintext = nil
 	return nil
