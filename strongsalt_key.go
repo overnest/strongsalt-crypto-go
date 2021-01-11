@@ -2,8 +2,10 @@ package strongsaltcrypto
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/overnest/strongsalt-crypto-go/aesgcm"
 
 	"github.com/overnest/strongsalt-crypto-go/hashtype"
@@ -318,11 +320,27 @@ func (k *StrongSaltKey) Encrypt(plaintext []byte) ([]byte, error) {
 	return k.Key.(KeyEncryptDecrypt).Encrypt(plaintext)
 }
 
+func (k *StrongSaltKey) EncryptBase64(plaintext []byte) (string, error) {
+	ciphertext, err := k.Encrypt(plaintext)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(ciphertext), nil
+}
+
 func (k *StrongSaltKey) Decrypt(ciphertext []byte) ([]byte, error) {
 	if !k.Key.CanDecrypt() {
 		return nil, fmt.Errorf("This key cannot decrypt data.")
 	}
 	return k.Key.(KeyEncryptDecrypt).Decrypt(ciphertext)
+}
+
+func (k *StrongSaltKey) DecryptBase64(ciphertext string) ([]byte, error) {
+	cipherbytes, err := base64.URLEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return nil, err
+	}
+	return k.Decrypt(cipherbytes)
 }
 
 //

@@ -223,3 +223,17 @@ func TestAesGcm(t *testing.T) {
 
 	assert.True(t, bytes.Equal(rawKey, newRawKey))
 }
+
+func TestBase64(t *testing.T) {
+	plaintext := []byte("Blarg Blerg Blorg Blergity Blorgity Blargity")
+	key, err := GenerateKey(Type_Secretbox)
+	assert.NoError(t, err)
+
+	ciphertext, err := key.EncryptBase64(plaintext)
+	assert.NoError(t, err)
+
+	decrypted, err := key.DecryptBase64(ciphertext)
+	assert.NoError(t, err)
+
+	assert.True(t, bytes.Equal(plaintext, decrypted))
+}
