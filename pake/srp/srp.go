@@ -136,6 +136,7 @@ import (
 	// stdlib has an enum for Blake2b_256; this lib registers itself against it.
 	_ "golang.org/x/crypto/blake2b"
 
+	ssc "github.com/overnest/strongsalt-crypto-go"
 	"github.com/overnest/strongsalt-crypto-go/interfaces"
 	argon2 "github.com/overnest/strongsalt-crypto-go/kdf/argon2"
 )
@@ -396,8 +397,9 @@ type Client struct {
 	xA *big.Int
 	k  *big.Int
 
-	xK []byte
-	xM []byte
+	xK  []byte
+	xM  []byte
+	ssk *ssc.StrongSaltKey
 }
 
 // NewClient constructs an SRP client instance.
@@ -495,6 +497,19 @@ func (c *Client) RawKey() []byte {
 	return c.xK
 }
 
+func (c *Client) StrongSaltKey() (*ssc.StrongSaltKey, error) {
+	if c.ssk != nil {
+		return c.ssk, nil
+	}
+	key, err := getStrongSaltKey(c.RawKey(), c.s.ver)
+	if err != nil {
+		return nil, err
+	}
+
+	c.ssk = key
+	return key, nil
+}
+
 // String represents the client parameters as a string value
 func (c *Client) String() string {
 	pf := c.s.pf
@@ -511,6 +526,7 @@ type Server struct {
 	xB   *big.Int
 	xK   []byte
 	xM   []byte
+	ssk  *ssc.StrongSaltKey
 }
 
 // Marshal returns a string encoding of the Server. This encoded string can be stored by the
@@ -673,6 +689,35 @@ func (s *Server) ClientOk(m string) (proof string, ok bool) {
 // RawKey returns the raw key negotiated as part of the SRP
 func (s *Server) RawKey() []byte {
 	return s.xK
+}
+
+func (s *Server) StrongSaltKey() (*ssc.StrongSaltKey, error) {
+	if s.ssk != nil {
+		return s.ssk, nil
+	}
+	key, err := getStrongSaltKey(s.RawKey(), s.s.ver)
+	if err != nil {
+		return nil, err
+	}
+
+	s.ssk = key
+	return key, nil
+}
+
+func getStrongSaltKey(rawKey []byte, ver int32) (*ssc.StrongSaltKey, error) {
+	if ver == 1 {
+		key, err := ssc.NewSymmetric(ssc.Type_Secretbox)
+		if err != nil {
+			return nil, err
+		}
+		wrappedKey := key.Key.(interfaces.KeySymmetric)
+		err = wrappedKey.SetKey(rawKey)
+		if err != nil {
+			return nil, err
+		}
+		return key, nil
+	}
+	return nil, fmt.Errorf("Invalid SRP version: %v", ver)
 }
 
 // String represents the Server parameters as a string value

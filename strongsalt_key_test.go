@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/overnest/strongsalt-crypto-go/interfaces"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,6 +24,20 @@ func TestSecretbox(t *testing.T) {
 	assert.NoError(t, err)
 
 	decrypted, err := newKey.Decrypt(ciphertext)
+	assert.NoError(t, err)
+	assert.True(t, bytes.Equal(plaintext, decrypted))
+
+	key, err = NewSymmetric(Type_Secretbox)
+	assert.NoError(t, err)
+
+	wrappedKey := key.Key.(interfaces.KeySymmetric)
+	err = wrappedKey.SetKey([]byte("This needs to be more bytes than a normal key would be."))
+	assert.NoError(t, err)
+
+	ciphertext, err = key.Encrypt(plaintext)
+	assert.NoError(t, err)
+
+	decrypted, err = key.Decrypt(ciphertext)
 	assert.NoError(t, err)
 	assert.True(t, bytes.Equal(plaintext, decrypted))
 }
@@ -198,7 +213,7 @@ func TestAesGcm(t *testing.T) {
 
 	decrypted, err := newKey.Decrypt(ciphertext)
 	assert.NoError(t, err)
-	assert.True(t,  bytes.Equal(plaintext, decrypted))
+	assert.True(t, bytes.Equal(plaintext, decrypted))
 
 	rawKey, err := key.GetRawKey()
 	assert.NoError(t, err)
@@ -206,5 +221,5 @@ func TestAesGcm(t *testing.T) {
 	newRawKey, err := newKey.GetRawKey()
 	assert.NoError(t, err)
 
-	assert.True(t,  bytes.Equal(rawKey, newRawKey))
+	assert.True(t, bytes.Equal(rawKey, newRawKey))
 }

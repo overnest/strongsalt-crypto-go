@@ -2,10 +2,12 @@ package secretbox
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 
+	"github.com/overnest/strongsalt-crypto-go/hashtype"
 	. "github.com/overnest/strongsalt-crypto-go/interfaces"
 	"github.com/overnest/strongsalt-crypto-go/version"
 	"golang.org/x/crypto/nacl/secretbox"
@@ -55,6 +57,14 @@ func (_ *SecretboxKey) New() KeySymmetric {
 }
 
 func (k *SecretboxKey) SetKey(data []byte) error {
+	if len(data) < keySizeV1 {
+		return fmt.Errorf("SecretBox key should be at least %v bytes.", keySizeV1)
+	}
+	if len(data) > keySizeV1 {
+		keyHmac := hmac.New(hashtype.TypeSha256.HashFunc, data)
+		keyHmac.Write([]byte("secretbox"))
+		data = keyHmac.Sum(nil)
+	}
 	var key [keySizeV1]byte
 	for i := 0; i < len(key); i++ {
 		key[i] = data[i]
