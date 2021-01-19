@@ -166,6 +166,22 @@ func (db *userdb) verify(t *testing.T, user, pass []byte, goodPw bool) {
 	ks := srv_um.RawKey()
 
 	assert(subtle.ConstantTimeCompare(kc, ks) == 1, "key mismatch;\nclient %x, server %x", kc, ks)
+
+	plaintext := []byte("blergity")
+
+	clientKey, err := c.StrongSaltKey()
+	assert(err == nil, "Client get StrongSaltKey: %s", err)
+
+	ciphertext, err := clientKey.Encrypt(plaintext)
+	assert(err == nil, "Client StrongSaltKey Encrypt: %s", err)
+
+	serverKey, err := srv_um.StrongSaltKey()
+	assert(err == nil, "Server get StrongSaltKey: %s", err)
+
+	decrypted, err := serverKey.Decrypt(ciphertext)
+	assert(err == nil, "Server StrongSaltKey Decrypt: %s", err)
+
+	assert(string(plaintext) == string(decrypted), "Decrypted ciphertext doesn't match plaintext")
 }
 
 func TestSRP(t *testing.T) {

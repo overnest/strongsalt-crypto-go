@@ -542,6 +542,7 @@ func (s *Server) Marshal() string {
 		s.xB.Text(10),
 		hex.EncodeToString(s.xK),
 		hex.EncodeToString(s.xM),
+		strconv.Itoa(int(s.s.ver)),
 	}, ":")
 }
 
@@ -549,7 +550,7 @@ func (s *Server) Marshal() string {
 // Server struct with the data if possible, otherwise it returns an error.
 func UnmarshalServer(s string) (*Server, error) {
 	p := strings.Split(s, ":")
-	if len(p) != 8 {
+	if len(p) != 9 {
 		return nil, fmt.Errorf("unmarshal: malformed fields exp 8, saw %d", len(p))
 	}
 
@@ -602,10 +603,16 @@ func UnmarshalServer(s string) (*Server, error) {
 		return nil, fmt.Errorf("unmarshal: invalid M: %s", p[7])
 	}
 
+	ver, err := strconv.Atoi(p[8])
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal: invalid version: %s", p[8])
+	}
+
 	return &Server{
 		s: &SRP{
-			h:  hf,
-			pf: pf,
+			h:   hf,
+			pf:  pf,
+			ver: int32(ver),
 		},
 		i:    i,
 		salt: salt,
